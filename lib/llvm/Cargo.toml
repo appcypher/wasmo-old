@@ -1,0 +1,6 @@
+[package]
+name = "wasm2llvm-llvm"
+version = "0.1.0"
+authors = ["Steve Akinyemi <appcypher@outlook.com>"]
+license = "Apache-2.0 WITH LLVM-exception"
+edition = "2018"
