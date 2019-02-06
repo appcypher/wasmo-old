@@ -9,7 +9,7 @@ It also allows stripping of expensive wasm runtime elements for times when full 
 Lastly, this project is also a platform for learning more about wasm and LLVM.
 
 ### PROPOSED API
-#### COMPLETE EXAMPLE
+#### COMPILATION PIPELINE
 ```rust
 // Create compiler flags.
 let compiler_flags = Some(CompilerOptions {
@@ -21,6 +21,7 @@ let compiler_flags = Some(CompilerOptions {
         RuntimeProperty::SignatureChecks,
         RuntimeProperty::TableChecks,
     ],
+    strategy: CompilationStrategy::Normal,
 });
 
 // Create wasm instance options.
@@ -42,13 +43,56 @@ let wasm_array = instance.set_array(&arguments);
 main.call(5, wasm_array);
 ```
 
-#### COMPILATION TYPE
+#### COMPILATION TYPES
+##### AOT COMPILATIONS
 ```rust
+// Create compiler flags.
+let compiler_flags = Some(CompilerOptions {
+    strategy: CompilationStrategy::AheadOfTime,
+    ..
+});
+
+// Create wasm instance options.
+let instance_options = Some(InstanceOptions { compiler_flags, .. });
+
 // instance holds an in-memory machine code of the entire wasm program.
-let (module, instance) = Runtime::aot_compile(wasm_binary, imports, instance_options);
+let (module, instantiate) = Runtime::instantiate(wasm_binary, imports, instance_options);
 
 // Create executables.
-let (imports_dylib, wasm_exe) = instance.create_executables();
+let (imports_dylib, wasm_exe) = module.create_executables();
+```
+
+##### LAZY COMPILATION
+```rust
+// Create compiler flags.
+let compiler_flags = Some(CompilerOptions {
+    strategy: CompilationStrategy::LazyCompilation,
+    ..
+});
+
+// Create wasm instance options.
+let instance_options = Some(InstanceOptions { compiler_flags, .. });
+
+// Functions are not compiled until their first call.
+let (module, instance) = Runtime::instantiate(wasm_binary, imports, instance_options);
+```
+
+##### REPL-TYPE LAZY COMPILATION
+```rust
+// Create compiler flags.
+let compiler_flags = Some(CompilerOptions {
+    strategy: CompilationStrategy::REPL,
+    ..
+});
+
+// Create wasm instance options.
+let instance_options = Some(InstanceOptions { compiler_flags, .. });
+
+// Lazily compiles the entire wasm instance.
+let (module, instance) = Runtime::instantiate(wasm_binary, imports, instance_options);
+
+let func = module.add_function(wasm_function_binary, instance);
+let expression = module.add_expression(wasm_expression_binary, instance);
 ```
 
 ### NOT CURRENTLY SUPPORTED
@@ -209,5 +253,3 @@ Based on Unicode Standard 11.0, Section 3.9, Table 3-7.
 | U+100000..U+10FFFF | F4           | 80..8F         | 80..BF        | 80..BF        |
 
 ---------------------------------------------------
-
-let mut parser = Parser::new(&code, &module); // ModuleEnvironment
