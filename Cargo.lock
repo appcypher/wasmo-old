@@ -1,0 +1,16 @@
+[[package]]
+name = "wasmlite"
+version = "0.1.0"
+dependencies = [
+ "wasmlite-ir 0.1.0",
+ "wasmlite-parser 0.1.0",
+]
+
+[[package]]
+name = "wasmlite-ir"
+version = "0.1.0"
+
+[[package]]
+name = "wasmlite-parser"
+version = "0.1.0"
+

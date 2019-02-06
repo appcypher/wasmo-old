@@ -1,0 +1,12 @@
+[package]
+name = "wasm2llvm"
+version = "0.1.0"
+authors = ["Steve Akinyemi <appcypher@outlook.com>"]
+edition = "2018"
+
+[dependencies]
+wasm2llvm-parser = { path = "lib/parser", version = "0.1.0" }
+
+[[bin]]
+name = "example"
+path = "src/example.rs"
