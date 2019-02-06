@@ -1,40 +1,58 @@
 
-# WASMER LLVM
+# WASM TO LLVM
+This project aims to provide the necessary tools for compiling wasm binary to LLVM IR which can further be compiled to machine-specific code.
+
+This project is supposed to make it easy for languages compiling to wasm to take advantage of the LLVM infrastructure as well as get the benefit of useful host APIs like Emscripten.
+
+It also allows stripping of expensive wasm runtime elements for times when full wasm specification is not desired.
+
+Lastly, this project is also a platform for learning more about wasm and LLVM.
+
+### PROPOSED API
+#### COMPLETE EXAMPLE
+```rust
+// Create compiler flags.
+let compiler_flags = Some(CompilerOptions {
+    optimization_level: 3,
+    exclude_passes: vec![
+        LLVMPass::InstCombine,
+    ],
+    runtime_ignores: vec![
+        RuntimeProperty::SignatureChecks,
+        RuntimeProperty::TableChecks,
+    ],
+});
+
+// Create wasm instance options.
+let instance_options = Some(InstanceOptions {
+    compiler_flags,
+    host_apis: vec![HostAPI::Emscripten],
+});
+
+// JIT compile module in current process.
+let (module, instance) = Runtime::instantiate(wasm_binary, imports, instance_options);
+
+// Get the exported main function from instance.
+let main = instance.get_func("main");
+
+// Store array of items in wasm memory 0
+let wasm_array = instance.set_array(&arguments);
+
+// Call the function.
+main.call(5, wasm_array);
+```
+
+#### COMPILATION TYPE
+```rust
+// instance holds an in-memory machine code of the entire wasm program.
+let (module, instance) = Runtime::aot_compile(wasm_binary, imports, instance_options);
+
+// Create executables.
+let (imports_dylib, wasm_exe) = instance.create_executables();
+```
+
 ### NOT CURRENTLY SUPPORTED
 - wasm64
-- Multiple wasm instances per process. Easy to refactor.
-- Multiple linear memories per wasm instance. Easy to refactor.
-
-### ASSUMPTIONS
-- Expects a Context type to have the following structure
-```rust
-Context {
-    tables: Buffer<ImmutableBuffer<Function>>,
-    memories: Buffer<Slice<u8>>,
-    globals: Buffer<usize>,
-    functions: Buffer<usize>,
-}
-
-Buffer {
-    data: *mut T,
-    len: usize,
-}
-
-ImmutableBuffer {
-    data: *const T,
-    len: usize,
-}
-
-Slice {
-    data: *mut T,
-}
-```
-- Expects memory storage strategy to take advantage of guard pages, so it does no bounds checking.
-
-### GOAL
-- Be faster than wasmer (compile-time and runtime)
-- Debugging support
-- Good error messages
 
 ### NON_GOAL
 - Have multiple backends
@@ -53,13 +71,16 @@ Slice {
 - fuzz tests
 - unittests
 - validation (utf8 [Unicode Standard 11.0, Section 3.9, Table 3-7. Well-Formed UTF-8 Byte Sequences] and semantics)
-https://www.unicode.org/versions/Unicode11.0.0/ch03.pdf
-https://webassembly.github.io/spec/core/binary/values.html#names
+
+    - https://www.unicode.org/versions/Unicode11.0.0/ch03.pdf
+    - https://webassembly.github.io/spec/core/binary/values.html#names
+
 - error messages and making error position point of error instead of start_position
 
 ### POSSIBLE FUTURE ADDITIONS
 - Lazy compilation
-- Fast Parser - No error handling, just abort with detailed message
+- Interpreter
+- AOT compilation
 
 ### PROCESS ADDRESS SPACE (LINUX x86-64 EXAMPLE)
 ```
@@ -98,43 +119,6 @@ https://webassembly.github.io/spec/core/binary/values.html#names
 |      TEXT SEGMENT
 +++++++++++++++++++++++++++
 ```
-
-### WASM ENCODING
-```
-+++++++++++++++++++++++++++
-|         MARK
-+++++++++++++++++++++++++++
-|         TYPES
-+++++++++++++++++++++++++++
-|        IMPORTS
-+++++++++++++++++++++++++++
-...
-```
-
-### NOTES
-- The instantiate function is what sepeartes the different backends
--
-
-
-### ROUGH PIPELINE
-```rust
-let (module, instance) = instantiate(source, imports, None);
-let value = instance.call("main", &[Value::I32(4)]);
-```
-
-```rust
-let options = Some(Options {
-    api: API::Emscripten,
-    optimization_level: Level::High,
-});
-let (module, instance) = instantiate_with_options(source, imports, options);
-let value = instance.call("main", &[]);
-```
-
-### TO MAKE IT WASM64
-- import and member module index must be u64
-- tables should have a boundedSlice of u64
-- indexing memories, tables, globals should be in u64
 
 # ENCODING
 ## LEB128
@@ -227,7 +211,3 @@ Based on Unicode Standard 11.0, Section 3.9, Table 3-7.
 ---------------------------------------------------
 
 let mut parser = Parser::new(&code, &module); // ModuleEnvironment
-
-### ATTRIBUTIONS
-[Wasmer]() - The wasm parser was started as an experimental effort while working on wasmer
-
