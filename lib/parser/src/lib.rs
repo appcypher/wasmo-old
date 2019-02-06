@@ -1,3 +1,2 @@
-mod parser;
-
-pub use self::parser::{Parser, Error};
+pub mod parser;
+pub mod errors;

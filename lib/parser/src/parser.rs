@@ -1,4 +1,8 @@
 use std::collections::HashMap;
+use wasm2llvm_llvm::module::Module;
+use crate::{
+    errors::ParserError,
+};
 
 #[derive(Debug, Clone)]
 /// A single-pass codegen parser.
@@ -23,7 +27,7 @@ impl <'a> Parser<'a> {
     /// TODO: TEST
     /// Generates the `module` object by calling functions
     /// that parse a wasm module.
-    pub fn module(&mut self) -> Result<(), (Error, usize)> {
+    pub fn module(&mut self) -> Result<(), (ParserError, usize)> {
         println!("\n=== module! ===");
 
         // Consume preamble. Panic if it returns an error.
@@ -37,7 +41,7 @@ impl <'a> Parser<'a> {
     /// TODO: TEST
     /// Checks if the following bytes are expected
     /// wasm preamble bytes.
-    pub fn module_preamble(&mut self) -> Result<(), (Error, usize)> {
+    pub fn module_preamble(&mut self) -> Result<(), (ParserError, usize)> {
         println!("\n=== module_preamble! ===");
         let start_position = self.cursor;
 
@@ -46,16 +50,16 @@ impl <'a> Parser<'a> {
             Ok(value) => {
                 // Magic number must be `\0asm`
                 if value != 0x6d736100 {
-                    return Err((Error::InvalidMagicNumber, start_position));
+                    return Err((ParserError::InvalidMagicNumber, start_position));
                 }
                 value
             },
             Err(error) => {
                 //
-                if error == Error::BufferEndReached {
-                    return Err((Error::IncompletePreamble, start_position));
+                if error == ParserError::BufferEndReached {
+                    return Err((ParserError::IncompletePreamble, start_position));
                 } else {
-                    return Err((Error::InvalidVersionNumber, start_position));
+                    return Err((ParserError::InvalidVersionNumber, start_position));
                 }
             },
         };
@@ -67,16 +71,16 @@ impl <'a> Parser<'a> {
             Ok(value) => {
                 // Only version 0x01 supported for now.
                 if value != 0x1 {
-                    return Err((Error::MalformedVersionNumber, start_position));
+                    return Err((ParserError::MalformedVersionNumber, start_position));
                 }
                 value
             },
             Err(error) => {
                 //
-                if error == Error::BufferEndReached {
-                    return Err((Error::IncompletePreamble, start_position));
+                if error == ParserError::BufferEndReached {
+                    return Err((ParserError::IncompletePreamble, start_position));
                 } else {
-                    return Err((Error::MalformedVersionNumber, start_position));
+                    return Err((ParserError::MalformedVersionNumber, start_position));
                 }
             },
         };
@@ -87,7 +91,7 @@ impl <'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn module_sections(&mut self) -> Result<(), (Error, usize)> {
+    pub fn module_sections(&mut self) -> Result<(), (ParserError, usize)> {
         println!("\n=== module_sections! ===");
 
         //
@@ -101,17 +105,17 @@ impl <'a> Parser<'a> {
                 Ok(value) => value,
                 Err(error) => {
                     //
-                    if error == Error::BufferEndReached {
+                    if error == ParserError::BufferEndReached {
                         break;
                     } else {
-                        return Err((Error::MalformedSectionId, start_position));
+                        return Err((ParserError::MalformedSectionId, start_position));
                     }
                 },
             };
 
             //
             if sections_consumed.contains(&section_id) {
-                return Err((Error::SectionAlreadyDefined, start_position));
+                return Err((ParserError::SectionAlreadyDefined, start_position));
             } else {
                 sections_consumed.push(section_id);
             }
@@ -122,7 +126,7 @@ impl <'a> Parser<'a> {
                 0x01 => self.type_section()?,
                 0x02 => self.import_section()?,
                 _ => {
-                    return Err((Error::UnsupportedSection, start_position));
+                    return Err((ParserError::UnsupportedSection, start_position));
                 },
             };
         }
@@ -130,7 +134,7 @@ impl <'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn custom_section(&mut self) -> Result<(), (Error, usize)> {
+    pub fn custom_section(&mut self) -> Result<(), (ParserError, usize)> {
         println!("\n=== custom_section! ===");
         let start_position = self.cursor;
 
@@ -139,10 +143,10 @@ impl <'a> Parser<'a> {
             Ok(value) => value,
             Err(error) => {
                 //
-                if error == Error::BufferEndReached {
-                    return Err((Error::IncompleteCustomSection, start_position));
+                if error == ParserError::BufferEndReached {
+                    return Err((ParserError::IncompleteCustomSection, start_position));
                 } else {
-                    return Err((Error::MalformedPayloadLengthInCustomSection, start_position));
+                    return Err((ParserError::MalformedPayloadLengthInCustomSection, start_position));
                 }
             }
         };
@@ -152,10 +156,10 @@ impl <'a> Parser<'a> {
             Ok(value) => value,
             Err(error) => {
                 //
-                if error == Error::BufferEndReached {
-                    return Err((Error::IncompleteCustomSection, start_position));
+                if error == ParserError::BufferEndReached {
+                    return Err((ParserError::IncompleteCustomSection, start_position));
                 } else {
-                    return Err((Error::MalformedEntryCountInTypeSection, start_position));
+                    return Err((ParserError::MalformedEntryCountInTypeSection, start_position));
                 }
             }
         };
@@ -166,7 +170,7 @@ impl <'a> Parser<'a> {
             let _name = match self.eat_bytes(name_len as _) {
                 Some(value) => value,
                 None => {
-                    return Err((Error::IncompleteCustomSection, start_position));
+                    return Err((ParserError::IncompleteCustomSection, start_position));
                 }
             };
         }
@@ -175,7 +179,7 @@ impl <'a> Parser<'a> {
         let _payload_data = match self.eat_bytes(payload_len as _) {
             Some(value) => value,
             None => {
-                return Err((Error::IncompleteCustomSection, start_position));
+                return Err((ParserError::IncompleteCustomSection, start_position));
             }
         };
 
@@ -183,7 +187,7 @@ impl <'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn type_section(&mut self) -> Result<(), (Error, usize)> {
+    pub fn type_section(&mut self) -> Result<(), (ParserError, usize)> {
         println!("\n=== type_section! ===");
         let start_position = self.cursor;
 
@@ -192,10 +196,10 @@ impl <'a> Parser<'a> {
             Ok(value) => value,
             Err(error) => {
                 //
-                if error == Error::BufferEndReached {
-                    return Err((Error::IncompleteTypeSection, start_position));
+                if error == ParserError::BufferEndReached {
+                    return Err((ParserError::IncompleteTypeSection, start_position));
                 } else {
-                    return Err((Error::MalformedPayloadLengthInTypeSection, start_position));
+                    return Err((ParserError::MalformedPayloadLengthInTypeSection, start_position));
                 }
             }
         };
@@ -207,10 +211,10 @@ impl <'a> Parser<'a> {
             Ok(value) => value,
             Err(error) => {
                 //
-                if error == Error::BufferEndReached {
-                    return Err((Error::IncompleteTypeSection, start_position));
+                if error == ParserError::BufferEndReached {
+                    return Err((ParserError::IncompleteTypeSection, start_position));
                 } else {
-                    return Err((Error::MalformedEntryCountInTypeSection, start_position));
+                    return Err((ParserError::MalformedEntryCountInTypeSection, start_position));
                 }
             }
         };
@@ -223,10 +227,10 @@ impl <'a> Parser<'a> {
                 Ok(value) => value,
                 Err(error) => {
                     //
-                    if error == Error::BufferEndReached {
-                        return Err((Error::EntriesDoNotMatchEntryCountInTypeSection, start_position));
+                    if error == ParserError::BufferEndReached {
+                        return Err((ParserError::EntriesDoNotMatchEntryCountInTypeSection, start_position));
                     } else {
-                        return Err((Error::MalformedTypeInTypeSection, start_position));
+                        return Err((ParserError::MalformedTypeInTypeSection, start_position));
                     }
                 },
             };
@@ -236,7 +240,7 @@ impl <'a> Parser<'a> {
             match type_id {
                 -0x20 => self.func_type()?,
                 _ => {
-                    return Err((Error::UnsupportedTypeInTypeSection, start_position));
+                    return Err((ParserError::UnsupportedTypeInTypeSection, start_position));
                 },
             };
         }
@@ -245,7 +249,7 @@ impl <'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn import_section(&mut self) -> Result<(), (Error, usize)> {
+    pub fn import_section(&mut self) -> Result<(), (ParserError, usize)> {
         println!("\n=== import_section! ===");
         let start_position = self.cursor;
 
@@ -254,10 +258,10 @@ impl <'a> Parser<'a> {
             Ok(value) => value,
             Err(error) => {
                 //
-                if error == Error::BufferEndReached {
-                    return Err((Error::IncompleteTypeSection, start_position));
+                if error == ParserError::BufferEndReached {
+                    return Err((ParserError::IncompleteTypeSection, start_position));
                 } else {
-                    return Err((Error::MalformedPayloadLengthInTypeSection, start_position));
+                    return Err((ParserError::MalformedPayloadLengthInTypeSection, start_position));
                 }
             }
         };
@@ -268,10 +272,10 @@ impl <'a> Parser<'a> {
             Ok(value) => value,
             Err(error) => {
                 //
-                if error == Error::BufferEndReached {
-                    return Err((Error::IncompleteTypeSection, start_position));
+                if error == ParserError::BufferEndReached {
+                    return Err((ParserError::IncompleteTypeSection, start_position));
                 } else {
-                    return Err((Error::MalformedEntryCountInTypeSection, start_position));
+                    return Err((ParserError::MalformedEntryCountInTypeSection, start_position));
                 }
             }
         };
@@ -287,7 +291,7 @@ impl <'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn function_section(&mut self) -> Result<(), (Error, usize)> {
+    pub fn function_section(&mut self) -> Result<(), (ParserError, usize)> {
         println!("\n=== import_section! ===");
         let start_position = self.cursor;
 
@@ -296,10 +300,10 @@ impl <'a> Parser<'a> {
             Ok(value) => value,
             Err(error) => {
                 //
-                if error == Error::BufferEndReached {
-                    return Err((Error::IncompleteTypeSection, start_position));
+                if error == ParserError::BufferEndReached {
+                    return Err((ParserError::IncompleteTypeSection, start_position));
                 } else {
-                    return Err((Error::MalformedPayloadLengthInTypeSection, start_position));
+                    return Err((ParserError::MalformedPayloadLengthInTypeSection, start_position));
                 }
             }
         };
@@ -310,10 +314,10 @@ impl <'a> Parser<'a> {
             Ok(value) => value,
             Err(error) => {
                 //
-                if error == Error::BufferEndReached {
-                    return Err((Error::IncompleteTypeSection, start_position));
+                if error == ParserError::BufferEndReached {
+                    return Err((ParserError::IncompleteTypeSection, start_position));
                 } else {
-                    return Err((Error::MalformedEntryCountInTypeSection, start_position));
+                    return Err((ParserError::MalformedEntryCountInTypeSection, start_position));
                 }
             }
         };
@@ -329,7 +333,7 @@ impl <'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn import_entry(&mut self) -> Result<(), (Error, usize)> {
+    pub fn import_entry(&mut self) -> Result<(), (ParserError, usize)> {
         println!("\n=== import_entry! ===");
         let start_position = self.cursor;
 
@@ -338,10 +342,10 @@ impl <'a> Parser<'a> {
             Ok(value) => value,
             Err(error) => {
                 //
-                if error == Error::BufferEndReached {
-                    return Err((Error::IncompleteImportEntry, start_position));
+                if error == ParserError::BufferEndReached {
+                    return Err((ParserError::IncompleteImportEntry, start_position));
                 } else {
-                    return Err((Error::MalformedModuleLengthInImportEntry, start_position));
+                    return Err((ParserError::MalformedModuleLengthInImportEntry, start_position));
                 }
             }
         };
@@ -353,7 +357,7 @@ impl <'a> Parser<'a> {
             let _module_str = match self.eat_bytes(module_len as _) {
                 Some(value) => value,
                 None => {
-                    return Err((Error::IncompleteImportEntry, start_position));
+                    return Err((ParserError::IncompleteImportEntry, start_position));
                 }
             };
 
@@ -365,10 +369,10 @@ impl <'a> Parser<'a> {
             Ok(value) => value,
             Err(error) => {
                 //
-                if error == Error::BufferEndReached {
-                    return Err((Error::IncompleteImportEntry, start_position));
+                if error == ParserError::BufferEndReached {
+                    return Err((ParserError::IncompleteImportEntry, start_position));
                 } else {
-                    return Err((Error::MalformedFieldLengthInImportEntry, start_position));
+                    return Err((ParserError::MalformedFieldLengthInImportEntry, start_position));
                 }
             }
         };
@@ -380,7 +384,7 @@ impl <'a> Parser<'a> {
             let _field_str = match self.eat_bytes(field_len as _) {
                 Some(value) => value,
                 None => {
-                    return Err((Error::IncompleteImportEntry, start_position));
+                    return Err((ParserError::IncompleteImportEntry, start_position));
                 }
             };
 
@@ -390,10 +394,10 @@ impl <'a> Parser<'a> {
         let external_kind =  match self.external_kind() {
             Ok(value) => value,
             Err(error) => {
-                if error == Error::BufferEndReached {
-                    return Err((Error::IncompleteImportEntry, start_position));
+                if error == ParserError::BufferEndReached {
+                    return Err((ParserError::IncompleteImportEntry, start_position));
                 } else {
-                    return Err((Error::MalformedImportTypeInImportEntry, start_position));
+                    return Err((ParserError::MalformedImportTypeInImportEntry, start_position));
                 }
             }
         };
@@ -408,7 +412,7 @@ impl <'a> Parser<'a> {
             // Global import
             0x03 => self.global_import()?,
             _ => {
-                return Err((Error::InvalidImportTypeInImportEntry, start_position));
+                return Err((ParserError::InvalidImportTypeInImportEntry, start_position));
             }
         }
 
@@ -416,7 +420,7 @@ impl <'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn function_import(&mut self) -> Result<(), (Error, usize)> {
+    pub fn function_import(&mut self) -> Result<(), (ParserError, usize)> {
         println!("\n=== function_import! ===");
         let start_position = self.cursor;
 
@@ -426,10 +430,10 @@ impl <'a> Parser<'a> {
             Ok(value) => value,
             Err(error) => {
                 //
-                if error == Error::BufferEndReached {
-                    return Err((Error::IncompleteFunctionImport, start_position));
+                if error == ParserError::BufferEndReached {
+                    return Err((ParserError::IncompleteFunctionImport, start_position));
                 } else {
-                    return Err((Error::MalformedTypeIndexInFunctionImport, start_position));
+                    return Err((ParserError::MalformedTypeIndexInFunctionImport, start_position));
                 }
             }
         };
@@ -440,7 +444,7 @@ impl <'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn table_import(&mut self) -> Result<(), (Error, usize)> {
+    pub fn table_import(&mut self) -> Result<(), (ParserError, usize)> {
         println!("\n=== table_import! ===");
         let start_position = self.cursor;
 
@@ -449,16 +453,16 @@ impl <'a> Parser<'a> {
             Ok(value) => {
                 // Must be anyfunc
                 if value != -0x10 {
-                    return Err((Error::MalformedElementTypeInTableImport, start_position));
+                    return Err((ParserError::MalformedElementTypeInTableImport, start_position));
                 }
                 value
             },
             Err(error) => {
                 //
-                if error == Error::BufferEndReached {
-                    return Err((Error::IncompleteTableImport, start_position));
+                if error == ParserError::BufferEndReached {
+                    return Err((ParserError::IncompleteTableImport, start_position));
                 } else {
-                    return Err((Error::MalformedElementTypeInTableImport, start_position));
+                    return Err((ParserError::MalformedElementTypeInTableImport, start_position));
                 }
             }
         };
@@ -471,11 +475,11 @@ impl <'a> Parser<'a> {
             Err(error) => {
                 // TODO: LLVM module construction
                 let err = match error {
-                    (Error::BufferEndReached, _) => Error::IncompleteTableImport,
-                    (Error::MalformedFlagsInResizableLimits, _) => Error::MalformedFlagsInTableImport,
-                    (Error::MalformedInitialInResizableLimits, _) => Error::MalformedInitialInTableImport,
-                    (Error::MalformedMaximumInResizableLimits, _) => Error::MalformedMaximumInTableImport,
-                    (_, _) => Error::MalformedResizableLimitInTableImport,
+                    (ParserError::BufferEndReached, _) => ParserError::IncompleteTableImport,
+                    (ParserError::MalformedFlagsInResizableLimits, _) => ParserError::MalformedFlagsInTableImport,
+                    (ParserError::MalformedInitialInResizableLimits, _) => ParserError::MalformedInitialInTableImport,
+                    (ParserError::MalformedMaximumInResizableLimits, _) => ParserError::MalformedMaximumInTableImport,
+                    (_, _) => ParserError::MalformedResizableLimitInTableImport,
                 };
 
                 return Err((err, start_position))
@@ -490,7 +494,7 @@ impl <'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn memory_import(&mut self) -> Result<(), (Error, usize)> {
+    pub fn memory_import(&mut self) -> Result<(), (ParserError, usize)> {
         println!("\n=== memory_import! ===");
         let start_position = self.cursor;
 
@@ -500,11 +504,11 @@ impl <'a> Parser<'a> {
             Err(error) => {
                 /// TODO: LLVM module construction
                 let err = match error {
-                    (Error::BufferEndReached, _) => Error::IncompleteMemoryImport,
-                    (Error::MalformedFlagsInResizableLimits, _) => Error::MalformedFlagsInMemoryImport,
-                    (Error::MalformedInitialInResizableLimits, _) => Error::MalformedInitialInMemoryImport,
-                    (Error::MalformedMaximumInResizableLimits, _) => Error::MalformedMaximumInMemoryImport,
-                    (_, _) => Error::MalformedResizableLimitInMemoryImport,
+                    (ParserError::BufferEndReached, _) => ParserError::IncompleteMemoryImport,
+                    (ParserError::MalformedFlagsInResizableLimits, _) => ParserError::MalformedFlagsInMemoryImport,
+                    (ParserError::MalformedInitialInResizableLimits, _) => ParserError::MalformedInitialInMemoryImport,
+                    (ParserError::MalformedMaximumInResizableLimits, _) => ParserError::MalformedMaximumInMemoryImport,
+                    (_, _) => ParserError::MalformedResizableLimitInMemoryImport,
                 };
 
                 return Err((err, start_position))
@@ -519,7 +523,7 @@ impl <'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn global_import(&mut self) -> Result<(), (Error, usize)> {
+    pub fn global_import(&mut self) -> Result<(), (ParserError, usize)> {
         println!("\n=== global_import! ===");
         let start_position = self.cursor;
 
@@ -528,10 +532,10 @@ impl <'a> Parser<'a> {
             Ok(value) => value,
             Err(error) => {
                 //
-                if error == Error::BufferEndReached {
-                    return Err((Error::IncompleteGlobalImport, start_position));
+                if error == ParserError::BufferEndReached {
+                    return Err((ParserError::IncompleteGlobalImport, start_position));
                 } else {
-                    return Err((Error::MalformedContentTypeInGlobalImport, start_position));
+                    return Err((ParserError::MalformedContentTypeInGlobalImport, start_position));
                 }
             }
         };
@@ -543,10 +547,10 @@ impl <'a> Parser<'a> {
             Ok(value) => value,
             Err(error) => {
                 //
-                if error == Error::BufferEndReached {
-                    return Err((Error::IncompleteGlobalImport, start_position));
+                if error == ParserError::BufferEndReached {
+                    return Err((ParserError::IncompleteGlobalImport, start_position));
                 } else {
-                    return Err((Error::MalformedMutabilityInGlobalImport, start_position));
+                    return Err((ParserError::MalformedMutabilityInGlobalImport, start_position));
                 }
             }
         };
@@ -557,7 +561,7 @@ impl <'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn resizable_limits(&mut self) -> Result<(u32, Option<u32>), (Error, usize)> {
+    pub fn resizable_limits(&mut self) -> Result<(u32, Option<u32>), (ParserError, usize)> {
         println!("\n=== resizable_limits! ===");
         let start_position = self.cursor;
 
@@ -566,10 +570,10 @@ impl <'a> Parser<'a> {
             Ok(value) => value,
             Err(error) => {
                 //
-                if error == Error::BufferEndReached {
-                    return Err((Error::IncompleteResizableLimits, start_position));
+                if error == ParserError::BufferEndReached {
+                    return Err((ParserError::IncompleteResizableLimits, start_position));
                 } else {
-                    return Err((Error::MalformedFlagsInResizableLimits, start_position));
+                    return Err((ParserError::MalformedFlagsInResizableLimits, start_position));
                 }
             }
         };
@@ -579,10 +583,10 @@ impl <'a> Parser<'a> {
             Ok(value) => value,
             Err(error) => {
                 //
-                if error == Error::BufferEndReached {
-                    return Err((Error::IncompleteResizableLimits, start_position));
+                if error == ParserError::BufferEndReached {
+                    return Err((ParserError::IncompleteResizableLimits, start_position));
                 } else {
-                    return Err((Error::MalformedInitialInResizableLimits, start_position));
+                    return Err((ParserError::MalformedInitialInResizableLimits, start_position));
                 }
             }
         };
@@ -597,10 +601,10 @@ impl <'a> Parser<'a> {
                 Ok(value) => Some(value),
                 Err(error) => {
                     //
-                    if error == Error::BufferEndReached {
-                        return Err((Error::IncompleteResizableLimits, start_position));
+                    if error == ParserError::BufferEndReached {
+                        return Err((ParserError::IncompleteResizableLimits, start_position));
                     } else {
-                        return Err((Error::MalformedMaximumInResizableLimits, start_position));
+                        return Err((ParserError::MalformedMaximumInResizableLimits, start_position));
                     }
                 }
             };
@@ -610,7 +614,7 @@ impl <'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn func_type(&mut self) -> Result<(), (Error, usize)> {
+    pub fn func_type(&mut self) -> Result<(), (ParserError, usize)> {
         println!("\n=== func_type! ===");
         let start_position = self.cursor;
 
@@ -619,10 +623,10 @@ impl <'a> Parser<'a> {
             Ok(value) => value,
             Err(error) => {
                 //
-                if error == Error::BufferEndReached {
-                    return Err((Error::IncompleteFunctionType, start_position));
+                if error == ParserError::BufferEndReached {
+                    return Err((ParserError::IncompleteFunctionType, start_position));
                 } else {
-                    return Err((Error::MalformedParamCountInFunctionType, start_position));
+                    return Err((ParserError::MalformedParamCountInFunctionType, start_position));
                 }
             }
         };
@@ -635,10 +639,10 @@ impl <'a> Parser<'a> {
             let param_type = match self.value_type() {
                 Ok(value) => value,
                 Err(error) => {
-                    if error == Error::BufferEndReached {
-                        return Err((Error::IncompleteFunctionType, start_position));
+                    if error == ParserError::BufferEndReached {
+                        return Err((ParserError::IncompleteFunctionType, start_position));
                     } else {
-                        return Err((Error::MalformedParamTypeInFunctionType, start_position));
+                        return Err((ParserError::MalformedParamTypeInFunctionType, start_position));
                     }
                 }
             };
@@ -651,10 +655,10 @@ impl <'a> Parser<'a> {
             Ok(value) => value,
             Err(error) => {
                 //
-                if error == Error::BufferEndReached {
-                    return Err((Error::IncompleteFunctionType, start_position));
+                if error == ParserError::BufferEndReached {
+                    return Err((ParserError::IncompleteFunctionType, start_position));
                 } else {
-                    return Err((Error::MalformedReturnCountInFunctionType, start_position));
+                    return Err((ParserError::MalformedReturnCountInFunctionType, start_position));
                 }
             }
         };
@@ -666,10 +670,10 @@ impl <'a> Parser<'a> {
             let return_type = match self.value_type() {
                 Ok(value) => value,
                 Err(error) => {
-                    if error == Error::BufferEndReached {
-                        return Err((Error::IncompleteFunctionType, start_position));
+                    if error == ParserError::BufferEndReached {
+                        return Err((ParserError::IncompleteFunctionType, start_position));
                     } else {
-                        return Err((Error::MalformedReturnTypeInFunctionType, start_position));
+                        return Err((ParserError::MalformedReturnTypeInFunctionType, start_position));
                     }
                 }
             };
@@ -682,7 +686,7 @@ impl <'a> Parser<'a> {
 
     #[inline]
     /// TODO: TEST
-    pub fn value_type(&mut self) -> Result<i8, Error> {
+    pub fn value_type(&mut self) -> Result<i8, ParserError> {
         println!("\n=== value_type! ===");
 
         let value = self.varint7()?;
@@ -691,13 +695,13 @@ impl <'a> Parser<'a> {
         if value == -0x01 || value == -0x02 || value == -0x03 || value == -0x04 {
             Ok(value as _)
         } else {
-            Err(Error::InvalidValueType)
+            Err(ParserError::InvalidValueType)
         }
     }
 
     #[inline]
     /// TODO: TEST
-    pub fn external_kind(&mut self) -> Result<u8, Error> {
+    pub fn external_kind(&mut self) -> Result<u8, ParserError> {
         println!("\n=== external_kind! ===");
 
         let value = self.uint8()?;
@@ -706,7 +710,7 @@ impl <'a> Parser<'a> {
         if value == 0x00 || value == 0x01 || value == 0x02 || value == 0x03 {
             Ok(value as _)
         } else {
-            Err(Error::InvalidImportType)
+            Err(ParserError::InvalidImportType)
         }
     }
 
@@ -739,15 +743,15 @@ impl <'a> Parser<'a> {
     }
 
     /// Consumes 1 byte that represents an 8-bit unsigned integer
-    pub fn uint8(&mut self) -> Result<u8, Error> {
+    pub fn uint8(&mut self) -> Result<u8, ParserError> {
         if let Some(byte) = self.eat_byte() {
             return Ok(byte);
         }
-        Err(Error::BufferEndReached)
+        Err(ParserError::BufferEndReached)
     }
 
     /// Consumes 2 bytes that represent a 16-bit unsigned integer
-    pub fn uint16(&mut self) -> Result<u16, Error> {
+    pub fn uint16(&mut self) -> Result<u16, ParserError> {
         if let Some(bytes) = self.eat_bytes(2) {
             let mut shift = 0;
             let mut result = 0;
@@ -757,11 +761,11 @@ impl <'a> Parser<'a> {
             }
             return Ok(result);
         }
-        Err(Error::BufferEndReached)
+        Err(ParserError::BufferEndReached)
     }
 
     /// Consumes 4 bytes that represent a 32-bit unsigned integer
-    pub fn uint32(&mut self) -> Result<u32, Error> {
+    pub fn uint32(&mut self) -> Result<u32, ParserError> {
         if let Some(bytes) = self.eat_bytes(4) {
             let mut shift = 0;
             let mut result = 0;
@@ -771,47 +775,47 @@ impl <'a> Parser<'a> {
             }
             return Ok(result);
         }
-        Err(Error::BufferEndReached)
+        Err(ParserError::BufferEndReached)
     }
 
     /// Consumes a byte that represents a 1-bit LEB128 unsigned integer encoding
-    pub fn varuint1(&mut self) -> Result<bool, Error> {
+    pub fn varuint1(&mut self) -> Result<bool, ParserError> {
         if let Some(byte) = self.eat_byte() {
             return match byte {
                 1 => Ok(true),
                 0 => Ok(false),
-                _ => Err(Error::MalformedVaruint1),
+                _ => Err(ParserError::MalformedVaruint1),
             };
         }
         // We expect the if statement to return an Ok result. If it doesn't
         // then we are trying to read more than 1 byte, which is Malformed for a varuint1
-        Err(Error::BufferEndReached)
+        Err(ParserError::BufferEndReached)
     }
 
     /// Consumes a byte that represents a 7-bit LEB128 unsigned integer encoding
-    pub fn varuint7(&mut self) -> Result<u8, Error> {
+    pub fn varuint7(&mut self) -> Result<u8, ParserError> {
         if let Some(byte) = self.eat_byte() {
             let mut result = byte;
             // Check if msb is unset.
             if result & 0b1000_0000 != 0 {
-                return Err(Error::MalformedVaruint7);
+                return Err(ParserError::MalformedVaruint7);
             }
             return Ok(result);
         }
         // We expect the if statement to return an Ok result. If it doesn't
         // then we are trying to read more than 1 byte, which is Malformed for a varuint7
-        Err(Error::BufferEndReached)
+        Err(ParserError::BufferEndReached)
     }
 
     /// Consumes 1-5 bytes that represent a 32-bit LEB128 unsigned integer encoding
-    pub fn varuint32(&mut self) -> Result<u32, Error> {
+    pub fn varuint32(&mut self) -> Result<u32, ParserError> {
         // println!("= varuint32! ===");
         let mut result = 0;
         let mut shift = 0;
         while shift < 35 {
             let byte = match self.eat_byte() {
                 Some(value) => value,
-                None => return Err(Error::BufferEndReached),
+                None => return Err(ParserError::BufferEndReached),
             };
             // println!("count = {}, byte = 0b{:08b}", count, byte);
             // Unset the msb and shift by multiples of 7 to the left
@@ -825,16 +829,16 @@ impl <'a> Parser<'a> {
         }
         // We expect the loop to terminate early and return an Ok result. If it doesn't
         // then we are trying to read more than 5 bytes, which is Malformed for a varuint32
-        Err(Error::MalformedVaruint32)
+        Err(ParserError::MalformedVaruint32)
     }
 
     /// Consumes a byte that represents a 7-bit LEB128 signed integer encoding
-    pub fn varint7(&mut self) -> Result<i8, Error> {
+    pub fn varint7(&mut self) -> Result<i8, ParserError> {
         if let Some(byte) = self.eat_byte() {
             let mut result = byte;
             // Check if msb is unset.
             if result & 0b1000_0000 != 0 {
-                return Err(Error::MalformedVarint7);
+                return Err(ParserError::MalformedVarint7);
             }
             // If the 7-bit value is signed, extend the sign.
 		    if result & 0b0100_0000 == 0b0100_0000 {
@@ -844,11 +848,11 @@ impl <'a> Parser<'a> {
         }
         // We expect the if statement to return an Ok result. If it doesn't
         // then we are trying to read more than 1 byte, which is Malformed for a varint7
-        Err(Error::BufferEndReached)
+        Err(ParserError::BufferEndReached)
     }
 
     /// Consumes 1-5 bytes that represent a 32-bit LEB128 signed integer encoding
-    pub fn varint32(&mut self) -> Result<i32, Error> {
+    pub fn varint32(&mut self) -> Result<i32, ParserError> {
         // println!("= varint32! ===");
         let mut result = 0;
         let mut shift = 0;
@@ -856,7 +860,7 @@ impl <'a> Parser<'a> {
         while shift < 35 { // (shift = 0, 7, 14 .. 35)
             let byte = match self.eat_byte() {
                 Some(value) => value,
-                None => return Err(Error::BufferEndReached),
+                None => return Err(ParserError::BufferEndReached),
             };
             // println!("count = {}, byte = 0b{:08b}", count, byte);
             // Unset the msb and shift by multiples of 7 to the left
@@ -876,12 +880,12 @@ impl <'a> Parser<'a> {
         }
         // We expect the loop to terminate early and return an Ok result. If it doesn't
         // then we are trying to read more than 5 bytes, which is Malformed for a varint32
-        Err(Error::MalformedVarint32)
+        Err(ParserError::MalformedVarint32)
     }
 
     /// TODO: TEST
     /// Consumes 1-9 bytes that represent a 64-bit LEB128 signed integer encoding
-    pub fn varint64(&mut self) -> Result<i64, Error> {
+    pub fn varint64(&mut self) -> Result<i64, ParserError> {
         // println!("= varint64! ===");
         let mut result = 0;
         let mut shift = 0;
@@ -889,7 +893,7 @@ impl <'a> Parser<'a> {
         while shift < 63 { // (shift = 0, 7, 14 .. 56)
             let byte = match self.eat_byte() {
                 Some(value) => value,
-                None => return Err(Error::BufferEndReached),
+                None => return Err(ParserError::BufferEndReached),
             };
             // println!("count = {}, byte = 0b{:08b}", count, byte);
             // Unset the msb and shift by multiples of 7 to the left
@@ -909,7 +913,7 @@ impl <'a> Parser<'a> {
         }
         // We expect the loop to terminate early and return an Ok result. If it doesn't
         // then we are trying to read more than 5 bytes, which is Malformed for a varint32
-        Err(Error::MalformedVarint64)
+        Err(ParserError::MalformedVarint64)
     }
 }
 

@@ -1,5 +1,5 @@
 #[derive(Debug, Clone, PartialEq)]
-pub enum Error {
+pub enum ParserError {
     BufferEndReached,
     // Storage
     MalformedVaruint1,
@@ -79,5 +79,5 @@ pub enum Error {
 }
 
 // TODO: Implement
-pub fn error_to_string(error: (Error, usize)) {
+pub fn error_to_string(error: (ParserError, usize)) {
 }
