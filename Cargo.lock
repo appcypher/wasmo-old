@@ -1,18 +1,18 @@
 [[package]]
-name = "wasm2llvm"
+name = "wasmlite"
 version = "0.1.0"
 dependencies = [
- "wasm2llvm-parser 0.1.0",
+ "wasmlite-parser 0.1.0",
 ]
 
 [[package]]
-name = "wasm2llvm-llvm"
+name = "wasmlite-llvm"
 version = "0.1.0"
 
 [[package]]
-name = "wasm2llvm-parser"
+name = "wasmlite-parser"
 version = "0.1.0"
 dependencies = [
- "wasm2llvm-llvm 0.1.0",
+ "wasmlite-llvm 0.1.0",
 ]
 

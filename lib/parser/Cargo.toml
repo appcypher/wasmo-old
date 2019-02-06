@@ -1,9 +1,9 @@
 [package]
-name = "wasm2llvm-parser"
+name = "wasmlite-parser"
 version = "0.1.0"
 authors = ["Steve Akinyemi <appcypher@outlook.com>"]
 license = "Apache-2.0 WITH LLVM-exception"
 edition = "2018"
 
 [dependencies]
-wasm2llvm-llvm = { path = "../llvm", version = "0.1.0" }
+wasmlite-llvm = { path = "../llvm", version = "0.1.0" }

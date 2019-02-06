@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use wasm2llvm_llvm::module::Module;
+use wasmlite_llvm::module::Module;
 use crate::{
     errors::ParserError,
 };

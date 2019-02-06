@@ -1,5 +1,5 @@
 
-# WASM TO LLVM
+# WASMLITE (WASM TO LLVM)
 This project aims to provide the necessary tools for compiling wasm binary to LLVM IR which can further be compiled to machine-specific code.
 
 This project is supposed to make it easy for languages compiling to wasm to take advantage of the LLVM infrastructure as well as get the benefit of useful host APIs like Emscripten.

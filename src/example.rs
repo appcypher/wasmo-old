@@ -1,6 +1,6 @@
-use wasm2llvm_parser::parser::Parser;
+use wasmlite_parser::parser::Parser;
 
-use wasm2llvm::wasm_codes::{
+use wasmlite::wasm_codes::{
     get_import_section,
 };
 
