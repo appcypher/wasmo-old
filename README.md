@@ -104,10 +104,21 @@ let expression = module.add_expression(wasm_expression_binary, instance);
 - Single-pass parsing, validation and codegen from wasm binary to LLVM IR
 
 ### CURRENT SUPPORT
-- preamble
-- types
-- imports
-- functions
+- [ ] Parser
+    - [x] preamble
+    - [x] types
+    - [x] imports
+    - [ ] internal memories, tables
+    - [ ] elems, data, globals
+    - [ ] functions body
+    - [ ] exports
+    
+- [ ] Codegen
+- [ ] Runtime
+- [ ] Compilation Strategies
+- [ ] Compilation Flags
+- [ ] Emscripten Host API
+- [ ] Other Features
 
 ### TODO
 - wasm32 to LLVMIR to machine code

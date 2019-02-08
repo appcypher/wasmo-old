@@ -6,7 +6,11 @@ edition = "2018"
 
 [dependencies]
 wasmlite-parser = { path = "lib/parser", version = "0.1.0" }
+wasmlite-utils = { path = "lib/utils", version = "0.1.0" }
 
 [[bin]]
 name = "example"
 path = "src/example.rs"
+
+[features]
+debug = []

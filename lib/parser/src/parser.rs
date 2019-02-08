@@ -1,4 +1,6 @@
-use std::collections::HashMap;
+#[macro_use]
+use wasmlite_utils::*;
+
 use wasmlite_llvm::module::Module;
 use crate::{
     errors::ParserError,
@@ -28,7 +30,7 @@ impl <'a> Parser<'a> {
     /// Generates the `module` object by calling functions
     /// that parse a wasm module.
     pub fn module(&mut self) -> Result<(), (ParserError, usize)> {
-        println!("\n=== module! ===");
+        debug!("-> module! <-");
 
         // Consume preamble. Panic if it returns an error.
         self.module_preamble().unwrap();
@@ -42,7 +44,7 @@ impl <'a> Parser<'a> {
     /// Checks if the following bytes are expected
     /// wasm preamble bytes.
     pub fn module_preamble(&mut self) -> Result<(), (ParserError, usize)> {
-        println!("\n=== module_preamble! ===");
+        debug!("-> module_preamble! <-");
         let start_position = self.cursor;
 
         // Consume magic number.
@@ -64,7 +66,7 @@ impl <'a> Parser<'a> {
             },
         };
 
-        println!("\n::module_preamble::magic_no = 0x{:08x}", magic_no);
+        debug!("module_preamble::magic_no = 0x{:08x}", magic_no);
 
         // Consume version number.
         let version_no = match self.uint32() {
@@ -85,14 +87,14 @@ impl <'a> Parser<'a> {
             },
         };
 
-        println!("\n::module_preamble::version_no = 0x{:08x}", version_no);
+        debug!("module_preamble::version_no = 0x{:08x}", version_no);
 
         Ok(())
     }
 
     /// TODO: TEST
     pub fn module_sections(&mut self) -> Result<(), (ParserError, usize)> {
-        println!("\n=== module_sections! ===");
+        debug!("-> module_sections! <-");
 
         //
         let mut sections_consumed = vec![];
@@ -135,7 +137,7 @@ impl <'a> Parser<'a> {
 
     /// TODO: TEST
     pub fn custom_section(&mut self) -> Result<(), (ParserError, usize)> {
-        println!("\n=== custom_section! ===");
+        debug!("-> custom_section! <-");
         let start_position = self.cursor;
 
         //
@@ -188,7 +190,7 @@ impl <'a> Parser<'a> {
 
     /// TODO: TEST
     pub fn type_section(&mut self) -> Result<(), (ParserError, usize)> {
-        println!("\n=== type_section! ===");
+        debug!("-> type_section! <-");
         let start_position = self.cursor;
 
         //
@@ -204,7 +206,7 @@ impl <'a> Parser<'a> {
             }
         };
 
-        println!("\n::type_section::payload_len = 0x{:x}", payload_len);
+        debug!("type_section::payload_len = 0x{:x}", payload_len);
 
         //
         let entry_count = match self.varuint32() {
@@ -219,7 +221,7 @@ impl <'a> Parser<'a> {
             }
         };
 
-        println!("\n::type_section::entry_count = 0x{:x}", entry_count);
+        debug!("type_section::entry_count = 0x{:x}", entry_count);
 
         //
         for i in 0..entry_count {
@@ -235,7 +237,7 @@ impl <'a> Parser<'a> {
                 },
             };
 
-            println!("\n::type_section::type_id = {:?}", type_id);
+            debug!("type_section::type_id = {:?}", type_id);
 
             match type_id {
                 -0x20 => self.func_type()?,
@@ -250,7 +252,7 @@ impl <'a> Parser<'a> {
 
     /// TODO: TEST
     pub fn import_section(&mut self) -> Result<(), (ParserError, usize)> {
-        println!("\n=== import_section! ===");
+        debug!("-> import_section! <-");
         let start_position = self.cursor;
 
         //
@@ -265,7 +267,7 @@ impl <'a> Parser<'a> {
                 }
             }
         };
-        println!("\n::import_section::payload_len = 0x{:x}", payload_len);
+        debug!("import_section::payload_len = 0x{:x}", payload_len);
 
         //
         let entry_count = match self.varuint32() {
@@ -280,7 +282,7 @@ impl <'a> Parser<'a> {
             }
         };
 
-        println!("\n::import_section::entry_count = 0x{:x}", entry_count);
+        debug!("import_section::entry_count = 0x{:x}", entry_count);
 
         //
         for i in 0..entry_count {
@@ -292,7 +294,7 @@ impl <'a> Parser<'a> {
 
     /// TODO: TEST
     pub fn function_section(&mut self) -> Result<(), (ParserError, usize)> {
-        println!("\n=== import_section! ===");
+        debug!("-> import_section! <-");
         let start_position = self.cursor;
 
         //
@@ -307,7 +309,7 @@ impl <'a> Parser<'a> {
                 }
             }
         };
-        println!("\n::import_section::payload_len = 0x{:x}", payload_len);
+        debug!("import_section::payload_len = 0x{:x}", payload_len);
 
         //
         let entry_count = match self.varuint32() {
@@ -322,7 +324,7 @@ impl <'a> Parser<'a> {
             }
         };
 
-        println!("\n::import_section::entry_count = 0x{:x}", entry_count);
+        debug!("import_section::entry_count = 0x{:x}", entry_count);
 
         //
         for i in 0..entry_count {
@@ -334,7 +336,7 @@ impl <'a> Parser<'a> {
 
     /// TODO: TEST
     pub fn import_entry(&mut self) -> Result<(), (ParserError, usize)> {
-        println!("\n=== import_entry! ===");
+        debug!("-> import_entry! <-");
         let start_position = self.cursor;
 
         //
@@ -350,7 +352,7 @@ impl <'a> Parser<'a> {
             }
         };
 
-        println!("\n::import_entry::module_len = 0x{:x}", module_len);
+        debug!("import_entry::module_len = 0x{:x}", module_len);
 
         {
             // TODO: Validate UTF-8
@@ -361,7 +363,7 @@ impl <'a> Parser<'a> {
                 }
             };
 
-            println!("\n::import_entry::_module_str = {:?}", std::str::from_utf8(_module_str));
+            debug!("import_entry::_module_str = {:?}", std::str::from_utf8(_module_str));
         }
 
         //
@@ -377,7 +379,7 @@ impl <'a> Parser<'a> {
             }
         };
 
-        println!("\n::import_entry::field_len = 0x{:x}", field_len);
+        debug!("import_entry::field_len = 0x{:x}", field_len);
 
         {
             // TODO: Validate UTF-8
@@ -388,7 +390,7 @@ impl <'a> Parser<'a> {
                 }
             };
 
-            println!("\n::import_entry::_field_str = {:?}", std::str::from_utf8(_field_str));
+            debug!("import_entry::_field_str = {:?}", std::str::from_utf8(_field_str));
         }
 
         let external_kind =  match self.external_kind() {
@@ -421,7 +423,7 @@ impl <'a> Parser<'a> {
 
     /// TODO: TEST
     pub fn function_import(&mut self) -> Result<(), (ParserError, usize)> {
-        println!("\n=== function_import! ===");
+        debug!("-> function_import! <-");
         let start_position = self.cursor;
 
         // TODO: LLVM module construction
@@ -438,14 +440,14 @@ impl <'a> Parser<'a> {
             }
         };
 
-        println!("\n::function_import::type_index = {:?}", type_index);
+        debug!("function_import::type_index = {:?}", type_index);
 
         Ok(())
     }
 
     /// TODO: TEST
     pub fn table_import(&mut self) -> Result<(), (ParserError, usize)> {
-        println!("\n=== table_import! ===");
+        debug!("-> table_import! <-");
         let start_position = self.cursor;
 
         // TODO: LLVM module construction
@@ -467,7 +469,7 @@ impl <'a> Parser<'a> {
             }
         };
 
-        println!("\n::table_import::element_type = {:?}", element_type);
+        debug!("table_import::element_type = {:?}", element_type);
 
         //
         let (initial, maximum) = match self.resizable_limits() {
@@ -486,16 +488,16 @@ impl <'a> Parser<'a> {
             }
         };
 
-        println!("\n::table_import::initial = {:?}", initial);
+        debug!("table_import::initial = {:?}", initial);
 
-        println!("\n::table_import::maximum = {:?}", maximum);
+        debug!("table_import::maximum = {:?}", maximum);
 
         Ok(())
     }
 
     /// TODO: TEST
     pub fn memory_import(&mut self) -> Result<(), (ParserError, usize)> {
-        println!("\n=== memory_import! ===");
+        debug!("-> memory_import! <-");
         let start_position = self.cursor;
 
         //
@@ -515,16 +517,16 @@ impl <'a> Parser<'a> {
             }
         };
 
-        println!("\n::memory_import::initial = {:?}", initial);
+        debug!("memory_import::initial = {:?}", initial);
 
-        println!("\n::memory_import::maximum = {:?}", maximum);
+        debug!("memory_import::maximum = {:?}", maximum);
 
         Ok(())
     }
 
     /// TODO: TEST
     pub fn global_import(&mut self) -> Result<(), (ParserError, usize)> {
-        println!("\n=== global_import! ===");
+        debug!("-> global_import! <-");
         let start_position = self.cursor;
 
         // TODO: LLVM module construction
@@ -540,7 +542,7 @@ impl <'a> Parser<'a> {
             }
         };
 
-        println!("\n::global_import::content_type = {:?}", content_type);
+        debug!("global_import::content_type = {:?}", content_type);
 
         // TODO: LLVM module construction
         let mutability = match self.varuint1() {
@@ -555,14 +557,14 @@ impl <'a> Parser<'a> {
             }
         };
 
-        println!("\n::global_import::mutability = {:?}", mutability);
+        debug!("global_import::mutability = {:?}", mutability);
 
         Ok(())
     }
 
     /// TODO: TEST
     pub fn resizable_limits(&mut self) -> Result<(u32, Option<u32>), (ParserError, usize)> {
-        println!("\n=== resizable_limits! ===");
+        debug!("-> resizable_limits! <-");
         let start_position = self.cursor;
 
         /// TODO: LLVM module construction
@@ -615,7 +617,7 @@ impl <'a> Parser<'a> {
 
     /// TODO: TEST
     pub fn func_type(&mut self) -> Result<(), (ParserError, usize)> {
-        println!("\n=== func_type! ===");
+        debug!("-> func_type! <-");
         let start_position = self.cursor;
 
         //
@@ -631,7 +633,7 @@ impl <'a> Parser<'a> {
             }
         };
 
-        println!("\n::func_type::param_count = 0x{:x}", param_count);
+        debug!("func_type::param_count = 0x{:x}", param_count);
 
         //
         for i in 0..param_count {
@@ -647,7 +649,7 @@ impl <'a> Parser<'a> {
                 }
             };
 
-            println!("\n::func_type::param_type = {:?}", param_type);
+            debug!("func_type::param_type = {:?}", param_type);
         }
 
         //
@@ -663,7 +665,7 @@ impl <'a> Parser<'a> {
             }
         };
 
-        println!("\n::func_type::return_count = {:?}", return_count);
+        debug!("func_type::return_count = {:?}", return_count);
 
         if return_count {
             /// TODO: LLVM module construction
@@ -678,7 +680,7 @@ impl <'a> Parser<'a> {
                 }
             };
 
-            println!("\n::func_type::return_type = {:?}", return_type);
+            debug!("func_type::return_type = {:?}", return_type);
         }
 
         Ok(())
@@ -687,7 +689,7 @@ impl <'a> Parser<'a> {
     #[inline]
     /// TODO: TEST
     pub fn value_type(&mut self) -> Result<i8, ParserError> {
-        println!("\n=== value_type! ===");
+        debug!("-> value_type! <-");
 
         let value = self.varint7()?;
 
@@ -702,7 +704,7 @@ impl <'a> Parser<'a> {
     #[inline]
     /// TODO: TEST
     pub fn external_kind(&mut self) -> Result<u8, ParserError> {
-        println!("\n=== external_kind! ===");
+        debug!("-> external_kind! <-");
 
         let value = self.uint8()?;
 
@@ -809,7 +811,7 @@ impl <'a> Parser<'a> {
 
     /// Consumes 1-5 bytes that represent a 32-bit LEB128 unsigned integer encoding
     pub fn varuint32(&mut self) -> Result<u32, ParserError> {
-        // println!("= varuint32! ===");
+        // debug!("= varuint32! <-");
         let mut result = 0;
         let mut shift = 0;
         while shift < 35 {
@@ -817,7 +819,7 @@ impl <'a> Parser<'a> {
                 Some(value) => value,
                 None => return Err(ParserError::BufferEndReached),
             };
-            // println!("count = {}, byte = 0b{:08b}", count, byte);
+            // debug!("count = {}, byte = 0b{:08b}", count, byte);
             // Unset the msb and shift by multiples of 7 to the left
             let value = ((byte & !0b10000000) as u32) << shift;
             result |= value;
@@ -853,7 +855,7 @@ impl <'a> Parser<'a> {
 
     /// Consumes 1-5 bytes that represent a 32-bit LEB128 signed integer encoding
     pub fn varint32(&mut self) -> Result<i32, ParserError> {
-        // println!("= varint32! ===");
+        // debug!("= varint32! <-");
         let mut result = 0;
         let mut shift = 0;
         // Can consume at most 5 bytes
@@ -862,7 +864,7 @@ impl <'a> Parser<'a> {
                 Some(value) => value,
                 None => return Err(ParserError::BufferEndReached),
             };
-            // println!("count = {}, byte = 0b{:08b}", count, byte);
+            // debug!("count = {}, byte = 0b{:08b}", count, byte);
             // Unset the msb and shift by multiples of 7 to the left
             let value = ((byte & !0b10000000) as i32) << shift;
             result |= value;
@@ -886,7 +888,7 @@ impl <'a> Parser<'a> {
     /// TODO: TEST
     /// Consumes 1-9 bytes that represent a 64-bit LEB128 signed integer encoding
     pub fn varint64(&mut self) -> Result<i64, ParserError> {
-        // println!("= varint64! ===");
+        // debug!("= varint64! <-");
         let mut result = 0;
         let mut shift = 0;
         // Can consume at most 9 bytes
@@ -895,7 +897,7 @@ impl <'a> Parser<'a> {
                 Some(value) => value,
                 None => return Err(ParserError::BufferEndReached),
             };
-            // println!("count = {}, byte = 0b{:08b}", count, byte);
+            // debug!("count = {}, byte = 0b{:08b}", count, byte);
             // Unset the msb and shift by multiples of 7 to the left
             let value = ((byte & !0b10000000) as i64) << shift;
             result |= value;
