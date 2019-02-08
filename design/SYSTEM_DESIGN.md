@@ -1,7 +1,7 @@
 
 
 <div align="center">
-<img src="https://github.com/astrolang/wasmlite/blob/design/design/media/MEMORY_MODEL.png" alt="Astro Logo" width="140" height="140"></img>
+<img src="https://github.com/appcypher/wasmlite/blob/design/design/media/MEMORY_MODEL.png" alt="Design" width="473" height="886"></img>
 </div>
 
 ### DESIGN DIAGRAM

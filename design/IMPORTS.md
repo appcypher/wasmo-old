@@ -1,5 +1,5 @@
 ## IMPORTS
-Imports basically hold raw memory addresses and their description
+Imports basically hold raw memory addresses and their descriptions
 
 ```rust
 enum HostData {
@@ -20,7 +20,7 @@ enum ImportData {
 ```
 
 ### HOW IMPORTS WORK
-- instantiatate needs imports
+- instantiate needs imports
 - emscripten host data uses module's imports description to generate some imports
 - some emscripten host data (functions) reference instance guest data
 - imports generated from emscripten host data
