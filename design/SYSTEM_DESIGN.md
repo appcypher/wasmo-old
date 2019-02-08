@@ -1,7 +1,7 @@
 
 
 <div align="center">
-<img src="https://github.com/appcypher/wasmlite/blob/design/design/media/MEMORY_MODEL.png" alt="Design" width="140" height="140"></img>
+<img src="https://github.com/appcypher/wasmlite/blob/design/design/media/MEMORY_MODEL.png" alt="Design" width="946" height="1772"></img>
 </div>
 
 ### DESIGN DIAGRAM
