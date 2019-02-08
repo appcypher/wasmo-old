@@ -1,5 +1,5 @@
 ## IMPORTS
-Imports basically hold raw memory addresses and their description
+Imports basically hold raw memory addresses and their descriptions
 
 ```rust
 enum HostData {
