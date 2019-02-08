@@ -8,7 +8,7 @@ It also allows stripping of expensive wasm runtime elements for times when full 
 
 Lastly, it is a platform for learning about WebAssmbly, LLVM and how they can play well together.
 
-### PROPOSED API
+### POSSIBLE API (NOT FINAL)
 #### COMPILATION PIPELINE
 ```rust
 // Create compiler flags.
@@ -19,7 +19,7 @@ let compiler_flags = Some(CompilerOptions {
     ],
     runtime_ignores: vec![
         RuntimeProperty::SignatureChecks,
-        RuntimeProperty::TableChecks,
+        RuntimeProperty::MemoryBoundsChecks,
     ],
     strategy: CompilationStrategy::Normal,
 });
@@ -27,7 +27,7 @@ let compiler_flags = Some(CompilerOptions {
 // Create wasm instance options.
 let instance_options = Some(InstanceOptions {
     compiler_flags,
-    host_apis: vec![HostAPI::Emscripten],
+    host_apis: vec![HostAPI::Emscripten], // Problematic!
 });
 
 // JIT compile module in current process.
@@ -55,7 +55,8 @@ let compiler_flags = Some(CompilerOptions {
 // Create wasm instance options.
 let instance_options = Some(InstanceOptions { compiler_flags, .. });
 
-// instance holds an in-memory machine code of the entire wasm program.
+// instance holds an in-memory object code of the entire wasm program.
+// Possibly generates a dylib for Emscripten APIs as well.
 let (module, instantiate) = Runtime::instantiate(wasm_binary, imports, instance_options);
 
 // Create executables.
@@ -91,6 +92,7 @@ let instance_options = Some(InstanceOptions { compiler_flags, .. });
 // Lazily compiles the entire wasm instance.
 let (module, instance) = Runtime::instantiate(wasm_binary, imports, instance_options);
 
+// ???
 let func = module.add_function(wasm_function_binary, instance);
 let expression = module.add_expression(wasm_expression_binary, instance);
 ```
