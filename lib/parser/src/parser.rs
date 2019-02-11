@@ -790,7 +790,7 @@ impl <'a> Parser<'a> {
             };
         }
         // We expect the if statement to return an Ok result. If it doesn't
-        // then we are trying to read more than 1 byte, which is Malformed for a varuint1
+        // then we are trying to read more than 1 byte, which is malformed for a varuint1
         Err(ParserError::BufferEndReached)
     }
 
@@ -805,7 +805,7 @@ impl <'a> Parser<'a> {
             return Ok(result);
         }
         // We expect the if statement to return an Ok result. If it doesn't
-        // then we are trying to read more than 1 byte, which is Malformed for a varuint7
+        // then we are trying to read more than 1 byte, which is malformed for a varuint7
         Err(ParserError::BufferEndReached)
     }
 
@@ -830,7 +830,7 @@ impl <'a> Parser<'a> {
             shift += 7;
         }
         // We expect the loop to terminate early and return an Ok result. If it doesn't
-        // then we are trying to read more than 5 bytes, which is Malformed for a varuint32
+        // then we are trying to read more than 5 bytes, which is malformed for a varuint32
         Err(ParserError::MalformedVaruint32)
     }
 
@@ -848,14 +848,13 @@ impl <'a> Parser<'a> {
             }
             return Ok(result as i8);
         }
-        // We expect the if statement to return an Ok result. If it doesn't
-        // then we are trying to read more than 1 byte, which is Malformed for a varint7
+
         Err(ParserError::BufferEndReached)
     }
 
     /// Consumes 1-5 bytes that represent a 32-bit LEB128 signed integer encoding
     pub fn varint32(&mut self) -> Result<i32, ParserError> {
-        // debug!("= varint32! <-");
+        // debug!("-> varint32! <-");
         let mut result = 0;
         let mut shift = 0;
         // Can consume at most 5 bytes
@@ -881,7 +880,7 @@ impl <'a> Parser<'a> {
             shift += 7;
         }
         // We expect the loop to terminate early and return an Ok result. If it doesn't
-        // then we are trying to read more than 5 bytes, which is Malformed for a varint32
+        // then we are trying to read more than 5 bytes, which is malformed for a varint32
         Err(ParserError::MalformedVarint32)
     }
 
@@ -914,7 +913,7 @@ impl <'a> Parser<'a> {
             shift += 7;
         }
         // We expect the loop to terminate early and return an Ok result. If it doesn't
-        // then we are trying to read more than 5 bytes, which is Malformed for a varint32
+        // then we are trying to read more than 5 bytes, which is malformed for a varint64
         Err(ParserError::MalformedVarint64)
     }
 }
