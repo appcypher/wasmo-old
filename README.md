@@ -2,7 +2,7 @@
 # WASMLITE (WASM TO LLVM)
 This project aims to provide the necessary tools for compiling wasm binary to LLVM IR which can further be compiled to machine-specific code.
 
-This project is supposed to make it easy for languages compiling to wasm to take advantage of the LLVM infrastructure as well as get the benefit of useful host APIs like Emscripten.
+This project is supposed to make it easy for languages compiling to wasm to take advantage of the LLVM infrastructure.
 
 It also allows stripping of expensive wasm runtime elements for times when full wasm specification is not desired.
 
@@ -27,7 +27,7 @@ let compiler_flags = Some(CompilerOptions {
 // Create wasm instance options.
 let instance_options = Some(InstanceOptions {
     compiler_flags,
-    host_apis: vec![HostAPI::Emscripten], // Problematic!
+    abi: vec![ABI::LLVMMusl],
 });
 
 // JIT compile module in current process.
@@ -56,7 +56,7 @@ let compiler_flags = Some(CompilerOptions {
 let instance_options = Some(InstanceOptions { compiler_flags, .. });
 
 // instance holds an in-memory object code of the entire wasm program.
-// Possibly generates a dylib for Emscripten APIs as well.
+// Possibly generates a dylib for known imports as well.
 let (module, instantiate) = Runtime::instantiate(wasm_binary, imports, instance_options);
 
 // Create executables.
@@ -112,12 +112,12 @@ let expression = module.add_expression(wasm_expression_binary, instance);
     - [ ] elems, data, globals
     - [ ] functions body
     - [ ] exports
-    
+
 - [ ] Codegen
 - [ ] Runtime
 - [ ] Compilation Strategies
 - [ ] Compilation Flags
-- [ ] Emscripten Host API
+- [ ] An ABI
 - [ ] Other Features
 
 ### TODO
