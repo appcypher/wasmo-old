@@ -1,9 +1,10 @@
+
 use wasmlite_parser::parser::Parser;
 
 use wasmlite::wasm_codes::{
-    get_import_section,
+    function_with_locals_only,
 };
 
 fn main() {
-    Parser::new(&get_import_section()).module();
+    Parser::new(&function_with_locals_only()).module();
 }

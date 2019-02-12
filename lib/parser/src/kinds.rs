@@ -34,6 +34,21 @@ pub enum ErrorKind {
     EntriesDoNotMatchEntryCountInTypeSection,
     MalformedTypeInTypeSection,
     UnsupportedTypeInTypeSection,
+    // Import Section
+    IncompleteImportSection,
+    MalformedPayloadLengthInImportSection,
+    MalformedEntryCountInImportSection,
+    MalformedEntryInImportSection,
+    // Function Section
+    IncompleteFunctionSection,
+    MalformedPayloadLengthInFunctionSection,
+    MalformedEntryCountInFunctionSection,
+    MalformedEntryInFunctionSection,
+    // Code Section
+    IncompleteCodeSection,
+    MalformedPayloadLengthInCodeSection,
+    MalformedBodyCountInCodeSection,
+    MalformedBodyInCodeSection,
     // Import Entry
     IncompleteImportEntry,
     MalformedModuleLengthInImportEntry,
@@ -63,6 +78,12 @@ pub enum ErrorKind {
     IncompleteGlobalImport,
     MalformedContentTypeInGlobalImport,
     MalformedMutabilityInGlobalImport,
+    // Function Body
+    MalformedBodySizeInFunctionBody,
+    MalformedEndByteInFunctionBody,
+    // Local Entry
+    MalformedCountInLocalEntry,
+    MalformedTypeInLocalEntry,
     // Resizable Limits
     IncompleteResizableLimits,
     MalformedFlagsInResizableLimits,
