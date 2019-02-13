@@ -404,7 +404,7 @@ end         | byte [0x0b]
         f64.copysign  | 0xa6  |
 
     - CONVERSIONS
-    
+
         operator            | id    | immediates
         :-------------------|:------|:---------
         i32.wrap/i64        | 0xa7  |
