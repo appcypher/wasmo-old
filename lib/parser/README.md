@@ -210,6 +210,7 @@ end         | byte [0x0b]
     op_code - unint8
 
     - CONTROL FLOW
+
         operator      | id   | immediates
         :-------------|:-----|:---------
         unreachable	  | 0x00 |
@@ -225,18 +226,21 @@ end         | byte [0x0b]
         return	      | 0x0f |
 
     - CALL
+
         operator      | id   | immediates
         :-------------|:-----|:---------
         call     	  | 0x00 | varuint32  (function_index)
         call_indirect | 0x01 | varuint32, varuint1 (type_index, reserved)
 
     - PARAMETRIC
+
         operator      | id   | immediates
         :-------------|:-----|:---------
         drop     	  | 0x1a |
         select        | 0x1b |
 
     - VARIABLE ACCESS
+
         operator      | id   | immediates
         :-------------|:-----|:---------
         get_local	  | 0x20 | varuint32 (local_index)
@@ -246,6 +250,7 @@ end         | byte [0x0b]
         set_global	  | 0x24 | varuint32 (global_index)
 
     - MEMORY
+
         operator      | id    | immediates
         :-------------|:------|:---------
         i32.load      | 0x28  | memory_immediate
@@ -275,12 +280,14 @@ end         | byte [0x0b]
         memory.grow   | 0x40  | varuint1 (reserved)
 
         - MEMORY IMMEDIATE
+
             operator      | type
             :-------------|:----------
             flags         | varuint32 (a bitfield which currently contains the alignment in the least significant bits, encoded as log2(alignment))
             offset        | varuint32 (the value of the offset)
 
     - CONSTANTS
+
         operator      | id    | immediates
         :-------------|:------|:---------
         i32.const     | 0x41  | varint32 (a constant value interpreted as i32)
@@ -289,6 +296,7 @@ end         | byte [0x0b]
         f64.const     | 0x44  | uint64 (a constant value interpreted as f64)
 
     - COMPARISONS
+
         operator      | id    | immediates
         :-------------|:------|:---------
         i32.eqz       | 0x45  |
@@ -327,6 +335,7 @@ end         | byte [0x0b]
         f64.ge        | 0x66  |
 
     - NUMERIC
+
         operator      | id    | immediates
         :-------------|:------|:---------
         i32.clz       | 0x67  |
@@ -395,6 +404,7 @@ end         | byte [0x0b]
         f64.copysign  | 0xa6  |
 
     - CONVERSIONS
+    
         operator            | id    | immediates
         :-------------------|:------|:---------
         i32.wrap/i64        | 0xa7  |
@@ -420,6 +430,7 @@ end         | byte [0x0b]
         f64.promote/f32     | 0xbb  |
 
     - REINTERPRETATIONS
+
         operator            | id    | immediates
         :-------------------|:------|:---------
         i32.reinterpret/f32 | 0xbc  |
