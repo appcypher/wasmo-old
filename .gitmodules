@@ -1,3 +1,0 @@
-[submodule "testsuite"]
-	path = lib/tests/testsuite
-	url = https://github.com/WebAssembly/testsuite
