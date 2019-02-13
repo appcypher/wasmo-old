@@ -11,9 +11,14 @@ type ParserResult = Result<(), ParserError>;
 
 #[derive(Debug, Clone)]
 /// A single-pass codegen parser.
+///
 /// Generates a Module as it deserializes a wasm binary.
+///
+/// The error handling mechanism
+/// - Errors start at the primitive read functions like (varuint or uint8) and propagate up the call stack with each enclosing function
+///   fixing the error message to provide more context.
 pub struct Parser<'a> {
-    code: &'a Vec<u8>, // The wasm binary to parse
+    code: &'a [u8], // The wasm binary to parse
     cursor: usize,     // Used to track the current byte position as the parser advances.
     module: Module,    // The generated module
 }
@@ -21,7 +26,7 @@ pub struct Parser<'a> {
 /// Contains the implementation of parser
 impl<'a> Parser<'a> {
     /// Creates new parser
-    pub fn new(code: &'a Vec<u8>) -> Self {
+    pub fn new(code: &'a [u8]) -> Self {
         Parser {
             code,
             cursor: 0, // cursor starts at first byte
@@ -629,7 +634,7 @@ impl<'a> Parser<'a> {
         let body_size = get_value!(
             self.varuint32(),
             cursor,
-            IncompleteTypeSection,
+            IncompleteFunctionBody,
             MalformedBodySizeInFunctionBody
         );
 
@@ -642,7 +647,7 @@ impl<'a> Parser<'a> {
         let local_count = get_value!(
             self.varint32(),
             cursor,
-            IncompleteTypeSection,
+            IncompleteFunctionBody,
             MalformedBodySizeInFunctionBody
         );
 
@@ -658,26 +663,18 @@ impl<'a> Parser<'a> {
 
         // Consume code.
         for _ in (diff+1)..(body_size as _) {
-            self.instructions()?;
+            self.operator()?;
         }
 
         // Get end byte.
-        let end_byte = get_value!(
+        let end_byte = get_end_byte!(
             self.varint32(),
             cursor,
-            IncompleteTypeSection,
+            IncompleteFunctionBody,
             MalformedEndByteInFunctionBody
         );
 
         debug!("(function_body::end_byte = 0x{:x})", end_byte);
-
-        // Check if end byte is correct.
-        if end_byte != 0x0b {
-            return Err(ParserError {
-                kind: ErrorKind::MalformedEndByteInFunctionBody,
-                cursor,
-            });
-        }
 
         Ok(())
     }
@@ -711,8 +708,206 @@ impl<'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn instructions(&mut self) -> ParserResult {
+    pub fn operator(&mut self) -> ParserResult {
         debug!("-> instructions! <-");
+        let cursor = self.cursor;
+
+        let op_code = get_value!(
+            self.uint8(),
+            cursor,
+            IncompleteFunctionBody,
+            MalformedBodySizeInFunctionBody
+        );
+
+        // Dispatch to the right
+        match op_code {
+            // CONTROL FLOW
+            0x00 => unimplemented!(),
+            0x01 => unimplemented!(),
+            0x02 => unimplemented!(),
+            0x03 => unimplemented!(),
+            0x04 => unimplemented!(),
+            0x05 => unimplemented!(),
+            0x0b => unimplemented!(),
+            0x0c => unimplemented!(),
+            0x0d => unimplemented!(),
+            0x0e => unimplemented!(),
+            0x0f => unimplemented!(),
+            // CALL
+            0x10 => unimplemented!(),
+            0x11 => unimplemented!(),
+            // PARAMETRIC
+            0x1A => unimplemented!(),
+            0x1B => unimplemented!(),
+            // VARIABLE ACCESS
+        	0x20 => unimplemented!(),
+        	0x21 => unimplemented!(),
+        	0x22 => unimplemented!(),
+        	0x23 => unimplemented!(),
+        	0x24 => unimplemented!(),
+            // MEMORY
+            0x28 => unimplemented!(),
+            0x29 => unimplemented!(),
+            0x2a => unimplemented!(),
+            0x2b => unimplemented!(),
+            0x2c => unimplemented!(),
+            0x2d => unimplemented!(),
+            0x2e => unimplemented!(),
+            0x2f => unimplemented!(),
+            0x30 => unimplemented!(),
+            0x31 => unimplemented!(),
+            0x32 => unimplemented!(),
+            0x33 => unimplemented!(),
+            0x34 => unimplemented!(),
+            0x35 => unimplemented!(),
+            0x36 => unimplemented!(),
+            0x37 => unimplemented!(),
+            0x38 => unimplemented!(),
+            0x39 => unimplemented!(),
+            0x3a => unimplemented!(),
+            0x3b => unimplemented!(),
+            0x3c => unimplemented!(),
+            0x3d => unimplemented!(),
+            0x3e => unimplemented!(),
+            0x3f => unimplemented!(),
+            0x40 => unimplemented!(),
+            // CONSTANTS
+            0x41 => unimplemented!(),
+            0x42 => unimplemented!(),
+            0x43 => unimplemented!(),
+            0x44 => unimplemented!(),
+            // COMPARISONS
+            0x45 => unimplemented!(),
+            0x46 => unimplemented!(),
+            0x47 => unimplemented!(),
+            0x48 => unimplemented!(),
+            0x49 => unimplemented!(),
+            0x4a => unimplemented!(),
+            0x4b => unimplemented!(),
+            0x4c => unimplemented!(),
+            0x4d => unimplemented!(),
+            0x4e => unimplemented!(),
+            0x4f => unimplemented!(),
+            0x50 => unimplemented!(),
+            0x51 => unimplemented!(),
+            0x52 => unimplemented!(),
+            0x53 => unimplemented!(),
+            0x54 => unimplemented!(),
+            0x55 => unimplemented!(),
+            0x56 => unimplemented!(),
+            0x57 => unimplemented!(),
+            0x58 => unimplemented!(),
+            0x59 => unimplemented!(),
+            0x5a => unimplemented!(),
+            0x5b => unimplemented!(),
+            0x5c => unimplemented!(),
+            0x5d => unimplemented!(),
+            0x5e => unimplemented!(),
+            0x5f => unimplemented!(),
+            0x60 => unimplemented!(),
+            0x61 => unimplemented!(),
+            0x62 => unimplemented!(),
+            0x63 => unimplemented!(),
+            0x64 => unimplemented!(),
+            0x65 => unimplemented!(),
+            0x66 => unimplemented!(),
+            // NUMERIC
+            0x67 => unimplemented!(),
+            0x68 => unimplemented!(),
+            0x69 => unimplemented!(),
+            0x6a => unimplemented!(),
+            0x6b => unimplemented!(),
+            0x6c => unimplemented!(),
+            0x6d => unimplemented!(),
+            0x6e => unimplemented!(),
+            0x6f => unimplemented!(),
+            0x70 => unimplemented!(),
+            0x71 => unimplemented!(),
+            0x72 => unimplemented!(),
+            0x73 => unimplemented!(),
+            0x74 => unimplemented!(),
+            0x75 => unimplemented!(),
+            0x76 => unimplemented!(),
+            0x77 => unimplemented!(),
+            0x78 => unimplemented!(),
+            0x79 => unimplemented!(),
+            0x7a => unimplemented!(),
+            0x7b => unimplemented!(),
+            0x7c => unimplemented!(),
+            0x7d => unimplemented!(),
+            0x7e => unimplemented!(),
+            0x7f => unimplemented!(),
+            0x80 => unimplemented!(),
+            0x81 => unimplemented!(),
+            0x82 => unimplemented!(),
+            0x83 => unimplemented!(),
+            0x84 => unimplemented!(),
+            0x85 => unimplemented!(),
+            0x86 => unimplemented!(),
+            0x87 => unimplemented!(),
+            0x88 => unimplemented!(),
+            0x89 => unimplemented!(),
+            0x8a => unimplemented!(),
+            0x8b => unimplemented!(),
+            0x8c => unimplemented!(),
+            0x8d => unimplemented!(),
+            0x8e => unimplemented!(),
+            0x8f => unimplemented!(),
+            0x90 => unimplemented!(),
+            0x91 => unimplemented!(),
+            0x92 => unimplemented!(),
+            0x93 => unimplemented!(),
+            0x94 => unimplemented!(),
+            0x95 => unimplemented!(),
+            0x96 => unimplemented!(),
+            0x97 => unimplemented!(),
+            0x98 => unimplemented!(),
+            0x99 => unimplemented!(),
+            0x9a => unimplemented!(),
+            0x9b => unimplemented!(),
+            0x9c => unimplemented!(),
+            0x9d => unimplemented!(),
+            0x9e => unimplemented!(),
+            0x9f => unimplemented!(),
+            0xa0 => unimplemented!(),
+            0xa1 => unimplemented!(),
+            0xa2 => unimplemented!(),
+            0xa3 => unimplemented!(),
+            0xa4 => unimplemented!(),
+            0xa5 => unimplemented!(),
+            0xa6 => unimplemented!(),
+            // CONVERSIONS
+            0xa7 => unimplemented!(),
+            0xa8 => unimplemented!(),
+            0xa9 => unimplemented!(),
+            0xaa => unimplemented!(),
+            0xab => unimplemented!(),
+            0xac => unimplemented!(),
+            0xad => unimplemented!(),
+            0xae => unimplemented!(),
+            0xaf => unimplemented!(),
+            0xb0 => unimplemented!(),
+            0xb1 => unimplemented!(),
+            0xb2 => unimplemented!(),
+            0xb3 => unimplemented!(),
+            0xb4 => unimplemented!(),
+            0xb5 => unimplemented!(),
+            0xb6 => unimplemented!(),
+            0xb7 => unimplemented!(),
+            0xb8 => unimplemented!(),
+            0xb9 => unimplemented!(),
+            0xba => unimplemented!(),
+            0xbb => unimplemented!(),
+            // REINTERPRETATIONS
+            0xbc => unimplemented!(),
+            0xbd => unimplemented!(),
+            0xbe => unimplemented!(),
+            0xbf => unimplemented!(),
+            _ => {
+
+            }
+        }
+
         Ok(())
     }
 
@@ -931,7 +1126,7 @@ impl<'a> Parser<'a> {
     /// Consumes a byte that represents a 7-bit LEB128 unsigned integer encoding
     pub fn varuint7(&mut self) -> Result<u8, ErrorKind> {
         if let Some(byte) = self.eat_byte() {
-            let mut result = byte;
+            let result = byte;
             // Check if msb is unset.
             if result & 0b1000_0000 != 0 {
                 return Err(ErrorKind::MalformedVaruint7);

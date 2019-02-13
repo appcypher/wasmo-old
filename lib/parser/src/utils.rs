@@ -1,10 +1,10 @@
 #[derive(Debug)]
 pub enum Type {
-    I32, 
+    I32,
     I64,
-    F32, 
-    F64, 
-    Anyfunc, 
+    F32,
+    F64,
+    Anyfunc,
     Func,
     Empty,
 }
@@ -14,11 +14,10 @@ pub fn to_type(value: i8) -> Type {
         -0x01 => Type::I32,
         -0x02 => Type::I64,
         -0x03 => Type::F32,
-        -0x04 => Type::F64, 
-        -0x04 => Type::F64, 
-        -0x10 => Type::Anyfunc, 
-        -0x20 => Type::Func, 
-        -0x40 => Type::Empty, 
+        -0x04 => Type::F64,
+        -0x10 => Type::Anyfunc,
+        -0x20 => Type::Func,
+        -0x40 => Type::Empty,
         _ => unreachable!(),
     }
 }

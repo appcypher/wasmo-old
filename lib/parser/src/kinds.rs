@@ -79,6 +79,7 @@ pub enum ErrorKind {
     MalformedContentTypeInGlobalImport,
     MalformedMutabilityInGlobalImport,
     // Function Body
+    IncompleteFunctionBody,
     MalformedBodySizeInFunctionBody,
     MalformedEndByteInFunctionBody,
     // Local Entry
