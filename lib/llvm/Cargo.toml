@@ -6,7 +6,7 @@ license = "Apache-2.0"
 edition = "2018"
 #-----------------------------------------
 description = "This crate creates LLVM module and AOT/JIT facilities"
-readme = "README.md"
+readme = "../../README.md"
 repository = "https://github.com/appcypher/wasmlite"
 keywords = ["compiler", "webassmebly", "wasm", "vm", "runtime", "llvm"]
 categories = ["development-tools", "parser-implementations", "wasm"]
