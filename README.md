@@ -22,12 +22,13 @@ let compiler_flags = Some(CompilerOptions {
         RuntimeProperty::TableChecks,
     ],
     strategy: CompilationStrategy::Normal,
+    pgo: true,
 });
 
 // Create wasm instance options.
 let instance_options = Some(InstanceOptions {
     compiler_flags,
-    host_apis: vec![HostAPI::Emscripten],
+    host_apis: vec![ABI::Emscripten],
 });
 
 // JIT compile module in current process.
