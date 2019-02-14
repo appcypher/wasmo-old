@@ -190,6 +190,7 @@ count       | varuint32 (count of function bodies)
 bodies      | function_body*
 
 FUNCTION_BODY
+
 fields      | type
 :-----------|:------
 body_size   | varuint32 (in bytes)

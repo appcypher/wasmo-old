@@ -50,3 +50,11 @@ macro_rules! get_end_byte {
         }
     };
 }
+
+macro_rules! llvm {
+    ($expr:expr) => {
+        if cfg!(llvm) {
+            $expr
+        }
+    };
+}

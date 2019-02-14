@@ -59,7 +59,7 @@ impl<'a> Parser<'a> {
         let magic_no = match self.uint32() {
             Ok(value) => {
                 // Magic number must be `\0asm`
-                if value != 0x6d736100 {
+                if value != 0x6d73_6100 {
                     return Err(ParserError {
                         kind: ErrorKind::InvalidMagicNumber,
                         cursor,
@@ -935,12 +935,7 @@ impl<'a> Parser<'a> {
         );
 
         //
-        let mut maximum = None;
-
-        //
-        if flags {
-            // TODO: LLVM module construction
-            maximum = match self.varuint32() {
+        let maximum = if flags { match self.varuint32() {
                 Ok(value) => Some(value),
                 Err(error) => {
                     if error == ErrorKind::BufferEndReached {
@@ -955,8 +950,10 @@ impl<'a> Parser<'a> {
                         });
                     }
                 }
-            };
-        }
+            }
+        } else {
+            None
+        };
 
         Ok((initial, maximum))
     }

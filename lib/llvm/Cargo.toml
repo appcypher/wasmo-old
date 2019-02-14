@@ -2,5 +2,16 @@
 name = "wasmlite-llvm"
 version = "0.1.0"
 authors = ["Steve Akinyemi <appcypher@outlook.com>"]
-license = "Apache-2.0 WITH LLVM-exception"
+license = "Apache-2.0"
 edition = "2018"
+#-----------------------------------------
+description = "The crate creates LLVM module and JIT facilities"
+readme = "README.md"
+repository = "https://github.com/appcypher/wasmlite"
+keywords = ["compiler", "webassmebly", "wasm", "vm", "runtime", "llvm"]
+categories = ["development-tools", "parser-implementations", "wasm"]
+documentation = "#"
+homepage = "#"
+
+[dependencies]
+llvm-sys = "60"

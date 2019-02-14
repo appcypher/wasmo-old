@@ -2,8 +2,16 @@
 name = "wasmlite-utils"
 version = "0.1.0"
 authors = ["Steve Akinyemi <appcypher@outlook.com>"]
-license = "Apache-2.0 WITH LLVM-exception"
+license = "Apache-2.0"
 edition = "2018"
+#-----------------------------------------
+description = "Utilities for wasmlite project"
+readme = "README.md"
+repository = "https://github.com/appcypher/wasmlite"
+keywords = ["compiler", "webassmebly", "wasm", "vm", "runtime", "llvm"]
+categories = ["development-tools", "parser-implementations", "wasm"]
+documentation = "#"
+homepage = "#"
 
 [features]
 debug = []
