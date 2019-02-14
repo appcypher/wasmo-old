@@ -90,14 +90,6 @@ version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "wasmlite"
-version = "0.0.1"
-dependencies = [
- "wasmlite-parser 0.0.1",
- "wasmlite-utils 0.0.1",
-]
-
-[[package]]
 name = "wasmlite-llvm"
 version = "0.0.1"
 dependencies = [

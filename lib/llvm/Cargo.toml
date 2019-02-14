@@ -1,11 +1,11 @@
 [package]
 name = "wasmlite-llvm"
-version = "0.1.0"
+version = "0.0.1"
 authors = ["Steve Akinyemi <appcypher@outlook.com>"]
 license = "Apache-2.0"
 edition = "2018"
 #-----------------------------------------
-description = "The crate creates LLVM module and JIT facilities"
+description = "This crate creates LLVM module and AOT/JIT facilities"
 readme = "README.md"
 repository = "https://github.com/appcypher/wasmlite"
 keywords = ["compiler", "webassmebly", "wasm", "vm", "runtime", "llvm"]

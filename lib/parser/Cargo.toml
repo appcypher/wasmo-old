@@ -1,11 +1,11 @@
 [package]
 name = "wasmlite-parser"
-version = "0.1.0"
+version = "0.0.1"
 authors = ["Steve Akinyemi <appcypher@outlook.com>"]
 license = "Apache-2.0"
 edition = "2018"
 #-----------------------------------------
-description = "The crate parses a WebAssembly module and can generate an LLVM based the data extracted from the module"
+description = "This crate parses WebAssembly modules and can generate LLVM IR based the data extracted from a module"
 readme = "README.md"
 repository = "https://github.com/appcypher/wasmlite"
 keywords = ["compiler", "webassmebly", "wasm", "parser", "llvm"]
@@ -14,8 +14,8 @@ documentation = "#"
 homepage = "#"
 
 [dependencies]
-wasmlite-llvm = { path = "../llvm", version = "0.1.0" }
-wasmlite-utils = { path = "../utils", version = "0.1.0" }
+wasmlite-llvm = { path = "../llvm", version = "0.0.1" }
+wasmlite-utils = { path = "../utils", version = "0.0.1" }
 
 [features]
 debug = []

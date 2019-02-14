@@ -1,6 +1,6 @@
 [package]
 name = "wasmlite"
-version = "0.1.0"
+version = "0.0.1"
 authors = ["Steve Akinyemi <appcypher@outlook.com>"]
 edition = "2018"
 #-----------------------------------------
@@ -14,8 +14,8 @@ homepage = "#"
 license = "Apache-2.0"
 
 [dependencies]
-wasmlite-parser = { path = "lib/parser", version = "0.1.0" }
-wasmlite-utils = { path = "lib/utils", version = "0.1.0" }
+wasmlite-parser = { path = "lib/parser", version = "0.0.1" }
+wasmlite-utils = { path = "lib/utils", version = "0.0.1" }
 
 [[bin]]
 name = "example"

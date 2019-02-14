@@ -1,11 +1,11 @@
 [package]
 name = "wasmlite-utils"
-version = "0.1.0"
+version = "0.0.1"
 authors = ["Steve Akinyemi <appcypher@outlook.com>"]
 license = "Apache-2.0"
 edition = "2018"
 #-----------------------------------------
-description = "Utilities for wasmlite project"
+description = "This crate contains utilities for wasmlite project"
 readme = "README.md"
 repository = "https://github.com/appcypher/wasmlite"
 keywords = ["compiler", "webassmebly", "wasm", "vm", "runtime", "llvm"]
