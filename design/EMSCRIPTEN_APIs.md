@@ -56,7 +56,9 @@ fun ___syscall39(which: CInt, varargs: CInt, var instance: Instance) -> CInt {
 ```
 
 ### EMSCRIPTEN ACCESSING GUEST FUNCTIONS
-```rust
+Performance can be improved with host binding implementation.
+
+```rust 
 // copy_cstr_into_instance
 fun copy_cstr_into_instance(str: *CChar, var instance: Instance) -> U32 {
     unsafe {
