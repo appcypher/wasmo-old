@@ -3,6 +3,15 @@ name = "wasmlite"
 version = "0.1.0"
 authors = ["Steve Akinyemi <appcypher@outlook.com>"]
 edition = "2018"
+#-----------------------------------------
+description = "An embeddable WebAssembly virtual machine"
+readme = "README.md"
+repository = "https://github.com/appcypher/wasmlite"
+keywords = ["compiler", "webassmebly", "wasm", "vm", "runtime"]
+categories = ["development-tools", "parser-implementations", "wasm"]
+documentation = "#"
+homepage = "#"
+license = "Apache-2.0"
 
 [dependencies]
 wasmlite-parser = { path = "lib/parser", version = "0.1.0" }
