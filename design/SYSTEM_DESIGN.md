@@ -64,8 +64,8 @@ type Offsets {
 ### OTHER COMPILATION STRATEGIES
 #### AOT
 - Generates module,
-- During compilation, creates an in-memory object file represnting the wasm program with unresolved links to imports.
-- Can generate dylib for EmscriptenHostData.
+- During compilation, creates an in-memory object code representing the wasm program with unresolved links to imports.
+- Can generate dylib for WasabiData.
 - Instantiation phase is unecessary here.
 
 #### LAZY JIT
@@ -77,3 +77,8 @@ type Offsets {
 - Generates module; nothing is compiled.
 - During instantiation, does validation only.
 - At runtime. The instance calls a `module.compile_wasm_func(binary)` that takes a wasm_binary, generates the llvm_ir, optionally validate it, compiles the code, fix the tramps and return the function address.
+
+---------
+
+#### PGO
+- Uses any of Normal, Lazy JIT and REPL Lazy JIT but the compiler lingers around and keeps certain profiling info for optimizing code further and hot-swapping code.
