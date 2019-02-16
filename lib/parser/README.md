@@ -1,14 +1,17 @@
-_Learn more about wasm binary encoding [here](https:-github.com/WebAssembly/design/blob/master/BinaryEncoding.md)_
+This parser is designed to parse an entire wasm module and generate corresponding intermediate representation. It is not the best for parsing a wasm module in bits. For that, you may need  [wasmparser](https://github.com/yurydelendik/wasmparser.rs)
+
+_Resources for learning more about wasm binary:_
+- https:-github.com/WebAssembly/design/blob/master/BinaryEncoding.md
+- https://github.com/sunfishcode/wasm-reference-manual/blob/master/WebAssembly.md
 
 ### TODO
 - [ ] Finish instruction parsing
-- [ ] Basic LLVM integration
 - [ ] Complete other sections (table, memory, global, export, start, element, data)
 - [ ] Add custom sections (name section and linking section)
 - [ ] Parse-time validations
 - [ ] Fuzz tests
 
-## WASM BINARY BREAKDOWN
+This parser adheres to the following syntactic rules.
 
 TYPES
 ==================================
