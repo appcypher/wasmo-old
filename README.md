@@ -6,7 +6,7 @@ This project is supposed to make it easy for languages compiling to wasm to take
 
 It also allows stripping of expensive wasm runtime elements for times when full wasm specification is not desired.
 
-Lastly, it is a platform for learning about WebAssmbly, LLVM and how they can play well together.
+Lastly, it is a platform for learning about WebAssembly, LLVM and how they can play well together.
 
 ### POSSIBLE API (NOT FINAL)
 #### COMPILATION PIPELINE
