@@ -33,7 +33,7 @@ macro_rules! get_end_byte {
                     });
                 }
                 value
-            },
+            }
             Err(error) => {
                 if error == ErrorKind::BufferEndReached {
                     return Err(ParserError {
@@ -51,11 +51,3 @@ macro_rules! get_end_byte {
     };
 }
 
-#[macro_export]
-macro_rules! llvm {
-    ($expr:expr) => {
-        if cfg!(llvm) {
-            $expr
-        }
-    };
-}

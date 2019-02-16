@@ -1,15 +1,7 @@
-#[derive(Debug)]
-pub enum Type {
-    I32,
-    I64,
-    F32,
-    F64,
-    Anyfunc,
-    Func,
-    Empty,
-}
+use crate::kinds::{SectionKind};
+use crate::ir::Type;
 
-pub fn to_type(value: i8) -> Type {
+pub fn int_to_type(value: i8) -> Type {
     match value {
         -0x01 => Type::I32,
         -0x02 => Type::I64,
@@ -22,35 +14,19 @@ pub fn to_type(value: i8) -> Type {
     }
 }
 
-#[derive(Debug)]
-pub enum Section {
-    Type,
-    Import,
-    Function,
-    Table,
-    Memory,
-    Global,
-    Export,
-    Start,
-    Element,
-    Code,
-    Data,
-}
-
-pub fn to_section(value: u8) -> Section {
+pub fn int_to_section(value: u8) -> SectionKind {
     match value {
-        0x1 => Section::Type,
-        0x2 => Section::Import,
-        0x3 => Section::Function,
-        0x4 => Section::Table,
-        0x5 => Section::Memory,
-        0x6 => Section::Global,
-        0x7 => Section::Export,
-        0x8 => Section::Start,
-        0x9 => Section::Element,
-        0xA => Section::Code,
-        0xB => Section::Data,
+        0x1 => SectionKind::Type,
+        0x2 => SectionKind::Import,
+        0x3 => SectionKind::Function,
+        0x4 => SectionKind::Table,
+        0x5 => SectionKind::Memory,
+        0x6 => SectionKind::Global,
+        0x7 => SectionKind::Export,
+        0x8 => SectionKind::Start,
+        0x9 => SectionKind::Element,
+        0xA => SectionKind::Code,
+        0xB => SectionKind::Data,
         _ => unreachable!(),
     }
 }
-

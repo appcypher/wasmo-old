@@ -19,6 +19,7 @@ pub enum ErrorKind {
     MalformedVersionNumber,
     InvalidVersionNumber,
     // Sections
+    IncompleteSection,
     SectionAlreadyDefined,
     UnsupportedSection,
     MalformedSectionId,
@@ -98,4 +99,19 @@ pub enum ErrorKind {
     MalformedReturnCountInFunctionType,
     MalformedReturnTypeInFunctionType,
     ReturnTypeDoesNotMatchReturnCountInFunctionType,
+}
+
+#[derive(Debug)]
+pub enum SectionKind {
+    Type,
+    Import,
+    Function,
+    Table,
+    Memory,
+    Global,
+    Export,
+    Start,
+    Element,
+    Code,
+    Data,
 }

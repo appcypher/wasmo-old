@@ -1,3 +1,9 @@
+use crate::{
+    kinds::ErrorKind,
+    parser::{Parser, ParserResult},
+    errors::ParserError,
+};
+
 /// Implementation based on Unicode Standard 11.0, Section 3.9, Table 3-7.
 // TODO: TEST THOROUGHLY!! (Codepoints, Grapheme Clusters, etc.)
 pub fn validate_utf8(bytes: &[u8]) -> bool {
@@ -60,4 +66,19 @@ pub fn validate_utf8(bytes: &[u8]) -> bool {
         }
     }
     true
+}
+
+/// Validate that section hasn't already been defined.
+pub fn validate_section_exists(parser: &mut Parser, section_id: u8, cursor: usize) -> ParserResult {
+    // Check if section has already been consumed.
+    if parser.sections_consumed.contains(&section_id) {
+        return Err(ParserError {
+            kind: ErrorKind::SectionAlreadyDefined,
+            cursor,
+        });
+    }
+
+    parser.push_section_id(&section_id);
+
+    Ok(())
 }

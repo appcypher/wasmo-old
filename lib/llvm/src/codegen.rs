@@ -24,6 +24,15 @@ impl LLVMModule {
         ()
     }
 
+
+    ///
+    fn get_wasm_ir(code: &[u8]) -> () {
+        let parser = Parser::new(code);
+        let wasm_ir = parser.module();
+        println!("wasm_ir = {:#?}", wasm_ir);
+        ()
+    }
+
     ///
     fn create_xxxx() -> () {
         ()

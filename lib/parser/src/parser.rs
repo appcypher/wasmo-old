@@ -1,26 +1,28 @@
 #[macro_use]
 use wasmlite_utils::*;
-
-use crate::{errors::ParserError, kinds::ErrorKind, macros, utils::*, };
-use wasmlite_llvm::module::Module;
+use crate::{
+    macros,
+    errors::ParserError,
+    kinds::ErrorKind,
+    utils::{int_to_section, int_to_type},
+    validation::validate_section_exists,
+};
 
 // TODO
 //  - Improve error reporting.
 
-type ParserResult = Result<(), ParserError>;
+pub type ParserResult = Result<(), ParserError>;
 
-#[derive(Debug, Clone)]
-/// A single-pass codegen parser.
-///
-/// Generates a Module as it deserializes a wasm binary.
+/// A WebAssembly module eager parser.
 ///
 /// The error handling mechanism
 /// - Errors start at the primitive read functions like (varuint or uint8) and propagate up the call stack with each enclosing function
 ///   fixing the error message to provide more context.
+#[derive(Debug, Clone)]
 pub struct Parser<'a> {
     code: &'a [u8], // The wasm binary to parse
-    cursor: usize,     // Used to track the current byte position as the parser advances.
-    module: Module,    // The generated module
+    cursor: usize,  // Used to track the current byte position as the parser advances.
+    pub(super) sections_consumed: Vec<u8>, // Holds the section ids that have been consumed. Section types cannot occur more than once.
 }
 
 /// Contains the implementation of parser
@@ -30,8 +32,18 @@ impl<'a> Parser<'a> {
         Parser {
             code,
             cursor: 0, // cursor starts at first byte
-            module: Module::new(),
+            sections_consumed: vec![],
         }
+    }
+
+    /// Sets the parser's cursor.
+    pub(super) fn set_cursor(&mut self, cursor: usize) {
+        self.cursor = cursor;
+    }
+
+    /// Pushes an id into the parser's sections_consumed.
+    pub(super) fn push_section_id(&mut self, section_id: &u8) {
+        self.sections_consumed.push(*section_id);
     }
 
     /// TODO: TEST
@@ -120,10 +132,6 @@ impl<'a> Parser<'a> {
     pub fn module_sections(&mut self) -> ParserResult {
         debug!("-> module_sections! <-");
 
-        // Holds the section ids that have been consumed.
-        // Section types cannot occur more than once.
-        let mut sections_consumed = vec![];
-
         // Iterate and Consume the section
         loop {
             let cursor = self.cursor;
@@ -143,19 +151,15 @@ impl<'a> Parser<'a> {
                 }
             };
 
-            // Check if section has already been consumed.
-            if sections_consumed.contains(&section_id) {
-                return Err(ParserError {
-                    kind: ErrorKind::SectionAlreadyDefined,
-                    cursor,
-                });
-            } else {
-                sections_consumed.push(section_id);
-            }
+            // Validate that section id exists
+            validate_section_exists(self, section_id, cursor)?;
 
-            debug!("(module_sections::section code = {:?})", to_section(section_id));
+            debug!(
+                "(module_sections::section code = {:?})",
+                int_to_section(section_id)
+            );
 
-            // Consume appropriate section depending on section id.
+            // Consume appropriate section based on section id.
             match section_id {
                 0x00 => self.custom_section()?,
                 0x01 => self.type_section()?,
@@ -170,6 +174,26 @@ impl<'a> Parser<'a> {
                 }
             };
         }
+        Ok(())
+    }
+
+    /// Gets the next section id and payload.
+    /// Needed by reader
+    pub fn module_section_id(&mut self) -> ParserResult {
+        debug!("-> module_section_id! <-");
+        let cursor = self.cursor;
+
+        // Get section id.
+        let section_id = get_value!(
+            self.varuint7(),
+            cursor,
+            IncompleteSection,
+            MalformedSectionId
+        );
+
+        // Validate that section id exists.
+        validate_section_exists(self, section_id, cursor)?;
+
         Ok(())
     }
 
@@ -527,7 +551,7 @@ impl<'a> Parser<'a> {
             }
         };
 
-        debug!("(table_import::element_type = {:?})", to_type(element_type));
+        debug!("(table_import::element_type = {:?})", int_to_type(element_type));
 
         //
         let (initial, maximum) = match self.resizable_limits() {
@@ -662,7 +686,7 @@ impl<'a> Parser<'a> {
         let diff = self.cursor - start_pos;
 
         // Consume code.
-        for _ in (diff+1)..(body_size as _) {
+        for _ in (diff + 1)..(body_size as _) {
             self.operator()?;
         }
 
@@ -702,7 +726,7 @@ impl<'a> Parser<'a> {
             MalformedTypeInLocalEntry
         );
 
-        debug!("(function_body::local_type = {:?})",  to_type(local_type));
+        debug!("(function_body::local_type = {:?})", int_to_type(local_type));
 
         Ok(())
     }
@@ -740,11 +764,11 @@ impl<'a> Parser<'a> {
             0x1A => unimplemented!(),
             0x1B => unimplemented!(),
             // VARIABLE ACCESS
-        	0x20 => unimplemented!(),
-        	0x21 => unimplemented!(),
-        	0x22 => unimplemented!(),
-        	0x23 => unimplemented!(),
-        	0x24 => unimplemented!(),
+            0x20 => unimplemented!(),
+            0x21 => unimplemented!(),
+            0x22 => unimplemented!(),
+            0x23 => unimplemented!(),
+            0x24 => unimplemented!(),
             // MEMORY
             0x28 => unimplemented!(),
             0x29 => unimplemented!(),
@@ -903,10 +927,19 @@ impl<'a> Parser<'a> {
             0xbd => unimplemented!(),
             0xbe => unimplemented!(),
             0xbf => unimplemented!(),
-            _ => {
-
-            }
+            _ => {}
         }
+
+        Ok(())
+    }
+
+    /********* OPERATORS *********/
+    /// TODO: TEST
+    pub fn operator_i32_add(&mut self) -> ParserResult {
+        debug!("-> operator_i32_add! <-");
+        let cursor = self.cursor;
+
+        // TODO
 
         Ok(())
     }
@@ -935,7 +968,8 @@ impl<'a> Parser<'a> {
         );
 
         //
-        let maximum = if flags { match self.varuint32() {
+        let maximum = if flags {
+            match self.varuint32() {
                 Ok(value) => Some(value),
                 Err(error) => {
                     if error == ErrorKind::BufferEndReached {
@@ -983,7 +1017,7 @@ impl<'a> Parser<'a> {
                 MalformedParamTypeInFunctionType
             );
 
-            debug!("(func_type::param_type = {:?})",  to_type(param_type));
+            debug!("(func_type::param_type = {:?})", int_to_type(param_type));
         }
 
         //
@@ -1005,13 +1039,12 @@ impl<'a> Parser<'a> {
                 MalformedReturnTypeInFunctionType
             );
 
-            debug!("(func_type::return_type = {:?})",  to_type(return_type));
+            debug!("(func_type::return_type = {:?})", int_to_type(return_type));
         }
 
         Ok(())
     }
 
-    #[inline]
     /// TODO: TEST
     pub fn value_type(&mut self) -> Result<i8, ErrorKind> {
         // debug!("-> value_type! <-");
@@ -1025,7 +1058,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-    #[inline]
     /// TODO: TEST
     pub fn external_kind(&mut self) -> Result<u8, ErrorKind> {
         debug!("-> external_kind! <-");
@@ -1042,7 +1074,6 @@ impl<'a> Parser<'a> {
 
     /******** UTILS ********/
 
-    #[inline]
     /// Gets a byte from the code buffer and (if available)
     /// advances the cursor.
     pub fn eat_byte(&mut self) -> Option<u8> {
@@ -1244,7 +1275,5 @@ impl<'a> Parser<'a> {
         // then we are trying to read more than 5 bytes, which is malformed for a varint64
         Err(ErrorKind::MalformedVarint64)
     }
-}
 
-// pub fn compile(source: Vec<u8>) -> Module {
-// }
+}
