@@ -108,10 +108,10 @@ let expression = module.add_expression(wasm_expression_binary, instance);
     - [x] preamble
     - [x] types
     - [x] imports
-    - [ ] internal memories, tables
+    - [ ] local memories, tables, globals
     - [ ] elems, data, globals
     - [ ] functions body
-    - [ ] exports
+    - [ ] exports (functions, tables, globals)
 
 - [ ] Codegen
 - [ ] Runtime
