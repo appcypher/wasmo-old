@@ -50,4 +50,3 @@ macro_rules! get_end_byte {
         }
     };
 }
-

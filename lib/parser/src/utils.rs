@@ -1,5 +1,5 @@
-use crate::kinds::{SectionKind};
 use crate::ir::Type;
+use crate::kinds::SectionKind;
 
 pub fn int_to_type(value: i8) -> Type {
     match value {

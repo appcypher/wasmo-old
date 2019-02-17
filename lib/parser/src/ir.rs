@@ -45,7 +45,7 @@ pub enum ImportDesc {
 }
 
 pub struct Module {
-    sections: Vec<Section>
+    sections: Vec<Section>,
 }
 
 ///
@@ -59,8 +59,12 @@ pub enum Section {
     Export,
     Start,
     Element,
-    Code { locals: Vec<Local>, instructions: Vec<Operator> },
+    Code {
+        locals: Vec<Local>,
+        instructions: Vec<Operator>,
+    },
     Data,
+    CustomSection,
 }
 
 ///

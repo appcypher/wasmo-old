@@ -1,9 +1,10 @@
 #[macro_use]
 use wasmlite_utils::*;
 use crate::{
-    macros,
     errors::ParserError,
-    kinds::ErrorKind,
+    ir::{FuncSig, Import, Module, Section, Type},
+    kinds::{ErrorKind, SectionKind},
+    macros,
     utils::{int_to_section, int_to_type},
     validation::validate_section_exists,
 };
@@ -11,7 +12,7 @@ use crate::{
 // TODO
 //  - Improve error reporting.
 
-pub type ParserResult = Result<(), ParserError>;
+pub type ParserResult<T> = Result<T, ParserError>;
 
 /// A WebAssembly module eager parser.
 ///
@@ -20,8 +21,8 @@ pub type ParserResult = Result<(), ParserError>;
 ///   fixing the error message to provide more context.
 #[derive(Debug, Clone)]
 pub struct Parser<'a> {
-    code: &'a [u8], // The wasm binary to parse
-    cursor: usize,  // Used to track the current byte position as the parser advances.
+    code: &'a [u8],                        // The wasm binary to parse
+    cursor: usize, // Used to track the current byte position as the parser advances.
     pub(super) sections_consumed: Vec<u8>, // Holds the section ids that have been consumed. Section types cannot occur more than once.
 }
 
@@ -47,15 +48,14 @@ impl<'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    /// Generates the `module` object by calling functions
-    /// that parse a wasm module.
-    pub fn module(&mut self) -> ParserResult {
+    /// Generates an IR rpresenting a parsed wasm module.
+    pub fn module(&mut self) -> ParserResult<()> {
         debug!("-> module! <-");
 
         // Consume preamble.
         self.module_preamble()?;
 
-        self.module_sections().unwrap(); // Optional
+        self.sections().unwrap(); // Optional
 
         Ok(())
     }
@@ -63,7 +63,7 @@ impl<'a> Parser<'a> {
     /// TODO: TEST
     /// Checks if the following bytes are expected
     /// wasm preamble bytes.
-    pub fn module_preamble(&mut self) -> ParserResult {
+    pub fn module_preamble(&mut self) -> ParserResult<()> {
         debug!("-> module_preamble! <-");
         let cursor = self.cursor;
 
@@ -129,8 +129,10 @@ impl<'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn module_sections(&mut self) -> ParserResult {
+    pub fn sections(&mut self) -> ParserResult<Vec<Section>> {
         debug!("-> module_sections! <-");
+
+        let mut sections = vec![];
 
         // Iterate and Consume the section
         loop {
@@ -160,26 +162,15 @@ impl<'a> Parser<'a> {
             );
 
             // Consume appropriate section based on section id.
-            match section_id {
-                0x00 => self.custom_section()?,
-                0x01 => self.type_section()?,
-                0x02 => self.import_section()?,
-                0x03 => self.function_section()?,
-                0x0A => self.code_section()?,
-                _ => {
-                    return Err(ParserError {
-                        kind: ErrorKind::UnsupportedSection,
-                        cursor,
-                    });
-                }
-            };
+            sections.push(self.section(section_id)?);
         }
-        Ok(())
+
+        Ok(sections)
     }
 
     /// Gets the next section id and payload.
     /// Needed by reader
-    pub fn module_section_id(&mut self) -> ParserResult {
+    pub fn section_id(&mut self) -> ParserResult<u8> {
         debug!("-> module_section_id! <-");
         let cursor = self.cursor;
 
@@ -194,14 +185,34 @@ impl<'a> Parser<'a> {
         // Validate that section id exists.
         validate_section_exists(self, section_id, cursor)?;
 
-        Ok(())
+        Ok(section_id)
+    }
+
+    /// Gets a module section
+    pub fn section(&mut self, section_id: u8) -> ParserResult<Section> {
+        debug!("-> section! <-");
+        let cursor = self.cursor;
+
+        Ok(match section_id {
+            0x00 => self.custom_section()?,
+            0x01 => self.type_section()?,
+            0x02 => self.import_section()?,
+            0x03 => self.function_section()?,
+            0x0A => self.code_section()?,
+            _ => {
+                return Err(ParserError {
+                    kind: ErrorKind::UnsupportedSection,
+                    cursor,
+                });
+            }
+        })
     }
 
     /******** SECTIONS ********/
 
     /// TODO: TEST
     /// TODO: Name section and linking section.
-    pub fn custom_section(&mut self) -> ParserResult {
+    pub fn custom_section(&mut self) -> ParserResult<Section> {
         debug!("-> custom_section! <-");
         let cursor = self.cursor;
 
@@ -246,11 +257,11 @@ impl<'a> Parser<'a> {
             }
         };
 
-        Ok(())
+        Ok(Section::CustomSection)
     }
 
     /// TODO: TEST
-    pub fn type_section(&mut self) -> ParserResult {
+    pub fn type_section(&mut self) -> ParserResult<Section> {
         debug!("-> type_section! <-");
         let cursor = self.cursor;
 
@@ -297,11 +308,12 @@ impl<'a> Parser<'a> {
             };
         }
 
-        Ok(())
+        // TODO
+        Ok(Section::Type(vec![]))
     }
 
     /// TODO: TEST
-    pub fn import_section(&mut self) -> ParserResult {
+    pub fn import_section(&mut self) -> ParserResult<Section> {
         debug!("-> import_section! <-");
         let cursor = self.cursor;
 
@@ -330,11 +342,12 @@ impl<'a> Parser<'a> {
             self.import_entry()?;
         }
 
-        Ok(())
+        // TODO
+        Ok(Section::Import(vec![]))
     }
 
     /// TODO: TEST
-    pub fn function_section(&mut self) -> ParserResult {
+    pub fn function_section(&mut self) -> ParserResult<Section> {
         debug!("-> function_section! <-");
         let cursor = self.cursor;
 
@@ -375,11 +388,12 @@ impl<'a> Parser<'a> {
             debug!("(function_section::type_index = 0x{:x})", type_index);
         }
 
-        Ok(())
+        // TODO
+        Ok(Section::Function(vec![]))
     }
 
     /// TODO: TEST
-    pub fn code_section(&mut self) -> ParserResult {
+    pub fn code_section(&mut self) -> ParserResult<Section> {
         debug!("-> code_section! <-");
         let cursor = self.cursor;
 
@@ -408,13 +422,14 @@ impl<'a> Parser<'a> {
             self.function_body()?;
         }
 
-        Ok(())
+        // TODO
+        Ok(Section::Code { locals: vec![], instructions: vec![] })
     }
 
     /******** IMPORTS ********/
 
     /// TODO: TEST
-    pub fn import_entry(&mut self) -> ParserResult {
+    pub fn import_entry(&mut self) -> ParserResult<()> {
         debug!("-> import_entry! <-");
         let cursor = self.cursor;
 
@@ -502,7 +517,7 @@ impl<'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn function_import(&mut self) -> ParserResult {
+    pub fn function_import(&mut self) -> ParserResult<()> {
         debug!("-> function_import! <-");
         let cursor = self.cursor;
 
@@ -520,7 +535,7 @@ impl<'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn table_import(&mut self) -> ParserResult {
+    pub fn table_import(&mut self) -> ParserResult<()> {
         debug!("-> table_import! <-");
         let cursor = self.cursor;
 
@@ -551,7 +566,10 @@ impl<'a> Parser<'a> {
             }
         };
 
-        debug!("(table_import::element_type = {:?})", int_to_type(element_type));
+        debug!(
+            "(table_import::element_type = {:?})",
+            int_to_type(element_type)
+        );
 
         //
         let (initial, maximum) = match self.resizable_limits() {
@@ -584,7 +602,7 @@ impl<'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn memory_import(&mut self) -> ParserResult {
+    pub fn memory_import(&mut self) -> ParserResult<()> {
         debug!("-> memory_import! <-");
         let cursor = self.cursor;
 
@@ -619,7 +637,7 @@ impl<'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn global_import(&mut self) -> ParserResult {
+    pub fn global_import(&mut self) -> ParserResult<()> {
         debug!("-> global_import! <-");
         let cursor = self.cursor;
 
@@ -650,7 +668,7 @@ impl<'a> Parser<'a> {
 
     /// TODO: TEST
     /// Each function body corresponds to the functions declared in the function section.
-    pub fn function_body(&mut self) -> ParserResult {
+    pub fn function_body(&mut self) -> ParserResult<()> {
         debug!("-> function_body! <-");
         let cursor = self.cursor;
 
@@ -704,7 +722,7 @@ impl<'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn local_entry(&mut self) -> ParserResult {
+    pub fn local_entry(&mut self) -> ParserResult<()> {
         debug!("-> local_entry! <-");
         let cursor = self.cursor;
 
@@ -726,13 +744,16 @@ impl<'a> Parser<'a> {
             MalformedTypeInLocalEntry
         );
 
-        debug!("(function_body::local_type = {:?})", int_to_type(local_type));
+        debug!(
+            "(function_body::local_type = {:?})",
+            int_to_type(local_type)
+        );
 
         Ok(())
     }
 
     /// TODO: TEST
-    pub fn operator(&mut self) -> ParserResult {
+    pub fn operator(&mut self) -> ParserResult<()> {
         debug!("-> instructions! <-");
         let cursor = self.cursor;
 
@@ -933,17 +954,6 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    /********* OPERATORS *********/
-    /// TODO: TEST
-    pub fn operator_i32_add(&mut self) -> ParserResult {
-        debug!("-> operator_i32_add! <-");
-        let cursor = self.cursor;
-
-        // TODO
-
-        Ok(())
-    }
-
     /******** TYPES ********/
 
     /// TODO: TEST
@@ -993,7 +1003,7 @@ impl<'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn func_type(&mut self) -> ParserResult {
+    pub fn func_type(&mut self) -> ParserResult<()> {
         // debug!("-> func_type! <-");
         let cursor = self.cursor;
 
@@ -1073,6 +1083,44 @@ impl<'a> Parser<'a> {
     }
 
     /******** UTILS ********/
+
+    /// TODO: TEST
+    pub fn skip_to_section(&mut self, section_id: u8) -> ParserResult<()> {
+        loop {
+            if section_id == self.section_id()? {
+                break;
+            }
+            let payload_len = self.peek_varuint32()?;
+            if !self.skip(payload_len as _) {
+                return Err(ParserError {
+                    kind: ErrorKind::BufferEndReached,
+                    cursor: self.cursor,
+                });
+            };
+        }
+        Ok(())
+    }
+
+    /// TODO: TEST
+    pub fn peek_varuint32(&mut self) -> ParserResult<u32> {
+        let cursor = self.cursor;
+        let value = self.varuint32();
+        self.cursor = cursor;
+        match value {
+            Ok(value) => Ok(value),
+            Err(kind) => Err(ParserError { kind, cursor }),
+        }
+    }
+
+    /// TODO: TEST
+    pub fn skip(&mut self, len: usize) -> bool {
+        let jump = self.cursor + len + 1;
+        // Check if jump is within code buffer bounds
+        if jump > self.code.len() {
+            return false;
+        }
+        true
+    }
 
     /// Gets a byte from the code buffer and (if available)
     /// advances the cursor.
@@ -1275,5 +1323,4 @@ impl<'a> Parser<'a> {
         // then we are trying to read more than 5 bytes, which is malformed for a varint64
         Err(ErrorKind::MalformedVarint64)
     }
-
 }

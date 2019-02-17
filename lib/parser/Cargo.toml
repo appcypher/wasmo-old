@@ -14,8 +14,7 @@ documentation = "https://github.com/appcypher/wasmlite"
 homepage = "https://github.com/appcypher/wasmlite"
 
 [dependencies]
-wasmlite-llvm = { path = "../llvm", version = "0.0.1" }
-wasmlite-utils = { path = "../utils", version = "0.0.1" }
+wasmlite-utils = { path = "../utils" }
 
 [features]
 debug = []

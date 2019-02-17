@@ -14,12 +14,9 @@ homepage = "https://github.com/appcypher/wasmlite"
 license = "Apache-2.0"
 
 [dependencies]
-wasmlite-parser = { path = "lib/parser", version = "0.0.1" }
-wasmlite-utils = { path = "lib/utils", version = "0.0.1" }
-
-[[bin]]
-name = "example"
-path = "src/example.rs"
+wasmlite-parser = { path = "lib/parser" }
+wasmlite-llvm = { path = "lib/llvm" }
+wasmlite-utils = { path = "lib/utils" }
 
 [features]
 debug = []
