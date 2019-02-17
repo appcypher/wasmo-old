@@ -1,49 +1,84 @@
 use llvm_sys::{
-    core,
+    LLVMContext,
+    LLVMModule,
+    LLVMBuilder,
+    core::{
+        LLVMContextCreate,
+        LLVMModuleCreateWithNameInContext,
+        LLVMCreateBuilderInContext,
+        LLVMContextDispose,
+        LLVMDisposeModule,
+        LLVMDisposeBuilder
+    },
 };
 
+use wasmlite_parser::parser::Parser;
+
 ///
-struct Module {
-    module: core::LLVMModule,
-    builder: core::LLVMBuilder,
-    ctx: core::LLVMContext.
+pub struct LLVMCodegen {
+    context: *mut LLVMContext,
+    module: *mut LLVMModule,
+    builder: *mut LLVMBuilder,
 }
 
-impl LLVMModule {
+impl LLVMCodegen {
     ///
-    fn new() -> Self {
-        Self {
-            module: unimplemented!(),
-            builder: unimplemented!(),
-            ctx: unimplemented!(),
+    pub fn new(module_name: &str) -> Self {
+        unsafe {
+            let context = LLVMContextCreate();
+            let module = LLVMModuleCreateWithNameInContext(module_name.as_ptr() as *const _, context);
+            let builder = LLVMCreateBuilderInContext(context);
+            Self { context, module, builder }
         }
     }
 
     ///
-    fn get_refs() -> () {
+    pub fn get_refs() -> () {
         ()
     }
 
-
     ///
-    fn get_wasm_ir(code: &[u8]) -> () {
-        let parser = Parser::new(code);
+    pub fn get_wasm_ir(code: &[u8]) -> () {
+        let mut parser = Parser::new(code);
         let wasm_ir = parser.module();
         println!("wasm_ir = {:#?}", wasm_ir);
         ()
     }
 
     ///
-    fn create_xxxx() -> () {
+    pub fn target_triple() -> () {
+        ()
+    }
+
+    ///
+    pub fn generate_instructions() -> () {
+        ()
+    }
+
+    ///
+    pub fn dispose_context() -> () {
+        ()
+    }
+
+    ///
+    pub fn dispose_module() -> () {
+        ()
+    }
+
+    ///
+    pub fn dispose_builder() -> () {
         ()
     }
 }
 
-impl Drop for LLVMModule {
+// TODO: My drop implementation segfaults!
+impl Drop for LLVMCodegen {
     /// Dispose builder, context and module.
     fn drop(&mut self) {
-        core::LLVMDisposeBuilder(self.builder);
-        core::LLVMDisposeModule(self.module);
-        core::LLVMDisposeContext(self.ctx);
+        unsafe {
+            LLVMContextDispose(self.context);
+            LLVMDisposeModule(self.module);
+            LLVMDisposeBuilder(self.builder);
+        }
     }
 }
