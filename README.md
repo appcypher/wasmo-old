@@ -99,9 +99,8 @@ let expression = module.add_expression(wasm_expression_binary, instance);
 
 ### NON_GOAL
 - Have multiple backends
+- Emscripten
 
-### STRATEGY
-- Single-pass parsing, validation and codegen from wasm binary to LLVM IR
 
 ### CURRENT SUPPORT
 - [ ] Parser
