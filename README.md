@@ -99,7 +99,6 @@ let expression = module.add_expression(wasm_expression_binary, instance);
 
 ### NON_GOAL
 - Have multiple backends
-- Emscripten
 
 
 ### CURRENT SUPPORT
