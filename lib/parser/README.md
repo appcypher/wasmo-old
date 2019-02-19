@@ -12,9 +12,10 @@ I have an issue with some aspects of wasm space and one of it is that `code sect
 
 ### TODO
 - [ ] Finish instruction parsing
-- [ ] Complete other sections (table, memory, global, export, start, element, data)
+- [x] Complete other sections (table, memory, global, export, start, element, data)
 - [ ] Add custom sections (name section and linking section)
 - [ ] Parse-time validations
+- [ ] Tests
 - [ ] Fuzz tests
 
 This parser adheres to the following syntactic rules.
