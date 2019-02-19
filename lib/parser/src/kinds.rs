@@ -1,23 +1,50 @@
+#[derive(Debug)]
+pub enum SectionKind {
+    Type,
+    Import,
+    Function,
+    Table,
+    Memory,
+    Global,
+    Export,
+    Start,
+    Element,
+    Code,
+    Data,
+}
+
+impl From<u8> for SectionKind {
+    fn from(value: u8) -> SectionKind {
+        match value {
+            0x1 => SectionKind::Type,
+            0x2 => SectionKind::Import,
+            0x3 => SectionKind::Function,
+            0x4 => SectionKind::Table,
+            0x5 => SectionKind::Memory,
+            0x6 => SectionKind::Global,
+            0x7 => SectionKind::Export,
+            0x8 => SectionKind::Start,
+            0x9 => SectionKind::Element,
+            0xA => SectionKind::Code,
+            0xB => SectionKind::Data,
+            _ => unreachable!(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum ErrorKind {
-    BufferEndReached,
-    // Storage
-    MalformedVaruint1,
-    MalformedVaruint7,
-    MalformedVarint7,
-    MalformedVaruint32,
-    MalformedVarint32,
-    MalformedVarint64,
-    // Types
-    InvalidValueType,
-    // ExternalKind
-    InvalidImportType,
+    //------------ PREAMBLE -------------//
+
     // Preamble
     IncompletePreamble,
     MalformedMagicNumber,
     InvalidMagicNumber,
     MalformedVersionNumber,
     InvalidVersionNumber,
+
+    //------------ SECTIONS -------------//
+
     // Sections
     IncompleteSection,
     SectionAlreadyDefined,
@@ -45,24 +72,48 @@ pub enum ErrorKind {
     MalformedPayloadLengthInFunctionSection,
     MalformedEntryCountInFunctionSection,
     MalformedEntryInFunctionSection,
-    // Code Section
-    IncompleteCodeSection,
-    MalformedPayloadLengthInCodeSection,
-    MalformedBodyCountInCodeSection,
-    MalformedBodyInCodeSection,
     // Table Section
     IncompleteTableSection,
     MalformedPayloadLengthInTableSection,
     MalformedEntryCountInTableSection,
     MalformedEntryInTableSection,
+    // Memory Section
+    IncompleteMemorySection,
+    MalformedPayloadLengthInMemorySection,
+    MalformedEntryCountInMemorySection,
+    MalformedEntryInMemorySection,
+    // Global Section
+    IncompleteGlobalSection,
+    MalformedPayloadLengthInGlobalSection,
+    MalformedEntryCountInGlobalSection,
+    MalformedEntryInGlobalSection,
     // Export Section
     IncompleteExportSection,
     MalformedPayloadLengthInExportSection,
     MalformedEntryCountInExportSection,
+    MalformedEntryInExportSection,
     // Start Section
     IncompleteStartSection,
     MalformedPayloadLengthInStartSection,
-    MalformedEntryCountInStartSection,
+    MalformedFunctionIndexInStartSection,
+    // Element Section
+    IncompleteElementSection,
+    MalformedPayloadLengthInElementSection,
+    MalformedEntryCountInElementSection,
+    MalformedEntryInElementSection,
+    // Code Section
+    IncompleteCodeSection,
+    MalformedPayloadLengthInCodeSection,
+    MalformedBodyCountInCodeSection,
+    MalformedBodyInCodeSection,
+    // Data Section
+    IncompleteDataSection,
+    MalformedPayloadLengthInDataSection,
+    MalformedEntryCountInDataSection,
+    MalformedEntryInDataSection,
+
+    //------------ ENTRIES -------------//
+
     // Import Entry
     IncompleteImportEntry,
     MalformedModuleNameLengthInImportEntry,
@@ -92,18 +143,6 @@ pub enum ErrorKind {
     IncompleteGlobalImport,
     MalformedContentTypeInGlobalImport,
     MalformedMutabilityInGlobalImport,
-    // Function Body
-    IncompleteFunctionBody,
-    MalformedBodySizeInFunctionBody,
-    MalformedEndByteInFunctionBody,
-    // Local Entry
-    MalformedCountInLocalEntry,
-    MalformedTypeInLocalEntry,
-    // Limits
-    IncompleteLimits,
-    MalformedFlagsInLimits,
-    MalformedMinimumInLimits,
-    MalformedMaximumInLimits,
     // Function Type
     IncompleteFunctionType,
     MalformedParamCountInFunctionType,
@@ -112,45 +151,71 @@ pub enum ErrorKind {
     MalformedReturnCountInFunctionType,
     MalformedReturnTypeInFunctionType,
     ReturnTypeDoesNotMatchReturnCountInFunctionType,
-    // Table Type
-    IncompleteTableType,
-    InvalidElementTypeInTableType,
-    MalformedLimitsInTableType,
-    MalformedMaximumInTableType,
-    MalformedMinimumInTableType,
-    MalformedFlagsInTableType,
-    // Memory Type
-    IncompleteMemoryType,
-    MalformedLimitsInMemoryType,
-    MalformedMaximumInMemoryType,
-    MalformedMinimumInMemoryType,
-    MalformedFlagsInMemoryType,
-    // Global
-    IncompleteGlobal,
-    MalformedEndByteInGlobal,
-    MalformedContentTypeInGlobal,
-    MalformedBodySizeInGlobal,
-    MalformedMutabilityInGlobal,
+    // Table Entry
+    IncompleteTableEntry,
+    MalformedElementTypeInTableEntry,
+    InvalidElementTypeInTableEntry,
+    MalformedLimitsInTableEntry,
+    MalformedMaximumInTableEntry,
+    MalformedMinimumInTableEntry,
+    MalformedFlagsInTableEntry,
+    // Memory Entry
+    IncompleteMemoryEntry,
+    MalformedLimitsInMemoryEntry,
+    MalformedMaximumInMemoryEntry,
+    MalformedMinimumInMemoryEntry,
+    MalformedFlagsInMemoryEntry,
+    // Global Entry
+    IncompleteGlobalEntry,
+    MalformedContentTypeInGlobalEntry,
+    MalformedMutabilityInGlobalEntry,
     // Export Entry
     IncompleteExportEntry,
-    // MalformedPayloadLengthInExportSection,
-    // MalformedEntryCountInExportSection,
     MalformedNameLengthInExportEntry,
-    MalformedImportTypeInExportEntry,
+    MalformedExportKindInExportEntry,
     InvalidExportTypeInExportEntry,
-}
+    MalformedExportIndexInExportEntry,
+    // Element Entry
+    IncompleteElementEntry,
+    MalformedInstructionInElementEntry,
+    MalformedTableIndexInElementEntry,
+    MalformedFunctionCountInElementEntry,
+    MalformedFunctionIndexInElementEntry,
+    // Function Body
+    IncompleteFunctionBody,
+    MalformedBodySizeInFunctionBody,
+    BodySizeDoesNotMatchContentOfFunctionBody,
+    // Local Entry
+    IncompleteLocalEntry,
+    MalformedCountInLocalEntry,
+    MalformedLocalTypeInLocalEntry,
+    // Instructions
+    IncompleteExpression,
+    MalformedOpcodeInExpression,
+    MalformedEndByteInExpression,
+    // Data Entry
+    IncompleteDataEntry,
+    MalformedTableIndexInDataEntry,
+    MalformedInstructionInDataEntry,
+    MalformedByteCountInDataEntry,
 
-#[derive(Debug)]
-pub enum SectionKind {
-    Type,
-    Import,
-    Function,
-    Table,
-    Memory,
-    Global,
-    Export,
-    Start,
-    Element,
-    Code,
-    Data,
+    //------------ UTILS -------------//
+
+    // Limits
+    IncompleteLimits,
+    MalformedFlagsInLimits,
+    MalformedMinimumInLimits,
+    MalformedMaximumInLimits,
+    // Storage
+    BufferEndReached,
+    MalformedVaruint1,
+    MalformedVaruint7,
+    MalformedVarint7,
+    MalformedVaruint32,
+    MalformedVarint32,
+    MalformedVarint64,
+    // Types
+    InvalidValueType,
+    // ExternalKind
+    InvalidImportType,
 }

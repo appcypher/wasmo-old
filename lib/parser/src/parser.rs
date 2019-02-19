@@ -1,14 +1,13 @@
 #[macro_use]
 use std::str;
 use crate::{
+    macros,
     errors::ParserError,
     ir::{
         Export, ExportDesc, Function, Global, Import, ImportDesc, Local, Memory, Module, Operator,
-        Section, Table, Type,
+        Section, Table, Type, Element, Data
     },
     kinds::{ErrorKind, SectionKind},
-    macros,
-    utils::{int_to_section, int_to_type},
     validation::validate_section_exists,
 };
 use wasmlite_utils::*;
@@ -20,9 +19,8 @@ pub type ParserResult<T> = Result<T, ParserError>;
 
 /// A WebAssembly module parser.
 ///
-/// The error handling mechanism
-/// - Errors start at the primitive read functions like (varuint or uint8) and propagate up the call stack with each enclosing function
-///   fixing the error message to provide more context.
+/// Notes
+/// - Just like with body_size in function body. payload_len should be used to determine if section content stay within payload range
 #[derive(Debug, Clone)]
 pub struct Parser<'a> {
     code: &'a [u8],                        // The wasm binary to parse
@@ -59,7 +57,10 @@ impl<'a> Parser<'a> {
         // Consume preamble.
         self.module_preamble()?;
 
-        self.sections().unwrap(); // Optional
+        // TODO: Module can stop here.
+        let sections = self.sections().unwrap();
+
+        debug!("(module::sections = {:#?})", sections);
 
         Ok(())
     }
@@ -167,7 +168,7 @@ impl<'a> Parser<'a> {
 
             debug!(
                 "(module_sections::section code = {:?})",
-                int_to_section(section_id)
+                SectionKind::from(section_id)
             );
 
             // Consume appropriate section based on section id.
@@ -234,7 +235,7 @@ impl<'a> Parser<'a> {
 
         // The length of the code section in bytes.
         let payload_len = get_value!(
-            self.varint32(),
+            self.varuint32(),
             cursor,
             IncompleteCustomSection,
             MalformedPayloadLengthInCustomSection
@@ -242,7 +243,7 @@ impl<'a> Parser<'a> {
 
         // Get name length of custom section.
         let name_len = get_value!(
-            self.varint32(),
+            self.varuint32(),
             cursor,
             IncompleteCustomSection,
             MalformedEntryCountInTypeSection
@@ -361,6 +362,7 @@ impl<'a> Parser<'a> {
         for _ in 0..entry_count {
             imports.push(self.import_entry()?);
         }
+        debug!("(import_section::import_entries = {:?})", imports);
 
         // TODO
         Ok(Section::Import(imports))
@@ -370,6 +372,7 @@ impl<'a> Parser<'a> {
     pub fn function_section(&mut self) -> ParserResult<Section> {
         debug!("-> function_section! <-");
         let cursor = self.cursor;
+        let mut type_indices = vec![];
 
         // The length of the code section in bytes.
         let payload_len = get_value!(
@@ -394,9 +397,8 @@ impl<'a> Parser<'a> {
             function_count
         );
 
-        // Consume the function entries.
+        // Consume the function index entries.
         for _ in 0..function_count {
-            // Index into the type section.
             let type_index = get_value!(
                 self.varuint32(),
                 cursor,
@@ -404,11 +406,12 @@ impl<'a> Parser<'a> {
                 MalformedEntryInFunctionSection
             );
 
-            debug!("(function_section::type_index = 0x{:x})", type_index);
+            type_indices.push(type_index);
         }
+        debug!("(function_section::type_indices = {:?})", type_indices);
 
         // TODO
-        Ok(Section::Function(vec![]))
+        Ok(Section::Function(type_indices))
     }
 
     /// TODO: TEST
@@ -439,25 +442,13 @@ impl<'a> Parser<'a> {
 
         // Consume the function entries.
         for _ in 0..table_count {
-            // Get table type.
-            let (element_type, minimum, maximum) = get_value!(
-                self.table_type(),
-                cursor,
-                IncompleteTableSection,
-                MalformedEntryInTableSection
-            );
-
-            tables.push(Table {
-                element_type,
-                minimum,
-                maximum,
-            });
-
-            debug!(
-                "(table_section::table_type = {:?})",
-                (element_type, minimum, maximum)
-            );
+            tables.push(self.table_entry()?);
         }
+
+        debug!(
+                "(table_section::table_entries = {:?})",
+                tables
+            );
 
         // TODO
         Ok(Section::Table(tables))
@@ -473,8 +464,8 @@ impl<'a> Parser<'a> {
         let payload_len = get_value!(
             self.varuint32(),
             cursor,
-            IncompleteTableSection,
-            MalformedPayloadLengthInTableSection
+            IncompleteMemorySection,
+            MalformedPayloadLengthInMemorySection
         );
 
         debug!("(memory_section::payload_len = 0x{:x})", payload_len);
@@ -483,26 +474,17 @@ impl<'a> Parser<'a> {
         let memory_count = get_value!(
             self.varuint32(),
             cursor,
-            IncompleteTableSection,
-            MalformedEntryCountInTableSection
+            IncompleteMemorySection,
+            MalformedEntryCountInMemorySection
         );
 
         debug!("(memory_section::memory_count = 0x{:x})", memory_count);
 
         // Consume the entries.
         for _ in 0..memory_count {
-            // Gewt memory type.
-            let (minimum, maximum) = get_value!(
-                self.memory_type(),
-                cursor,
-                IncompleteTableSection,
-                MalformedEntryInTableSection
-            );
-
-            memories.push(Memory { minimum, maximum });
-
-            debug!("(memory_section::memory_type = {:?})", (minimum, maximum));
+            memories.push(self.memory_entry()?);
         }
+        debug!("(memory_section::memory_entries = {:?})", memories);
 
         Ok(Section::Memory(memories))
     }
@@ -517,36 +499,27 @@ impl<'a> Parser<'a> {
         let payload_len = get_value!(
             self.varuint32(),
             cursor,
-            IncompleteFunctionSection,
-            MalformedPayloadLengthInFunctionSection
+            IncompleteGlobalSection,
+            MalformedPayloadLengthInGlobalSection
         );
 
         debug!("(global_section::payload_len = 0x{:x})", payload_len);
 
-        // Get the count of table entries,
+        // Get the count of global entries,
         let global_count = get_value!(
             self.varuint32(),
             cursor,
-            IncompleteTableSection,
-            MalformedEntryCountInTableSection
+            IncompleteGlobalSection,
+            MalformedEntryCountInGlobalSection
         );
 
         debug!("(global_section::global_count = 0x{:x})", global_count);
 
         // Consume the global entries.
         for _ in 0..global_count {
-            // Get global.
-            let global = get_value!(
-                self.global(),
-                cursor,
-                IncompleteTableSection,
-                MalformedEntryInTableSection
-            );
-
-            globals.push(global);
-
-            debug!("(memory_section::global_type = {:?})", global);
+            globals.push(self.global_entry()?);
         }
+        debug!("(global_section::global_entries = {:?})", globals);
 
         Ok(Section::Global(globals))
     }
@@ -557,7 +530,7 @@ impl<'a> Parser<'a> {
         let cursor = self.cursor;
         let mut exports = vec![];
 
-        // The length of the code section in bytes.
+        // The length of the export section in bytes.
         let payload_len = get_value!(
             self.varuint32(),
             cursor,
@@ -567,7 +540,7 @@ impl<'a> Parser<'a> {
 
         debug!("(export_section::payload_len = 0x{:x})", payload_len);
 
-        // Get the count of import entries.
+        // Get the count of export entries.
         let entry_count = get_value!(
             self.varuint32(),
             cursor,
@@ -577,10 +550,11 @@ impl<'a> Parser<'a> {
 
         debug!("(export_section::entry_count = 0x{:x})", entry_count);
 
-        // Consume the import entries.
+        // Consume the export entries.
         for _ in 0..entry_count {
             exports.push(self.export_entry()?);
         }
+        debug!("(export_section::export_entries = {:?})", exports);
 
         // TODO
         Ok(Section::Export(exports))
@@ -606,7 +580,7 @@ impl<'a> Parser<'a> {
             self.varuint32(),
             cursor,
             IncompleteStartSection,
-            MalformedEntryCountInStartSection
+            MalformedFunctionIndexInStartSection
         );
 
         // TODO
@@ -617,45 +591,39 @@ impl<'a> Parser<'a> {
     pub fn element_section(&mut self) -> ParserResult<Section> {
         debug!("-> element_section! <-");
         let cursor = self.cursor;
+        let mut elements = vec![];
 
-        // The length of the code section in bytes.
+        // The length of the element section in bytes.
         let payload_len = get_value!(
             self.varuint32(),
             cursor,
-            IncompleteFunctionSection,
-            MalformedPayloadLengthInFunctionSection
+            IncompleteElementSection,
+            MalformedPayloadLengthInElementSection
         );
 
-        debug!("(function_section::payload_len = 0x{:x})", payload_len);
+        debug!("(element_section::payload_len = 0x{:x})", payload_len);
 
-        // Get the count of function entries,
-        let function_count = get_value!(
+        // Get the count of element entries,
+        let element_count = get_value!(
             self.varuint32(),
             cursor,
-            IncompleteFunctionSection,
-            MalformedEntryCountInFunctionSection
+            IncompleteElementSection,
+            MalformedEntryCountInElementSection
         );
 
         debug!(
-            "(function_section::function_count = 0x{:x})",
-            function_count
+            "(element_section::element_count = 0x{:x})",
+            element_count
         );
 
-        // Consume the function entries.
-        for _ in 0..function_count {
-            // Index into the type section.
-            let type_index = get_value!(
-                self.varuint32(),
-                cursor,
-                IncompleteFunctionSection,
-                MalformedEntryInFunctionSection
-            );
-
-            debug!("(function_section::type_index = 0x{:x})", type_index);
+        // Consume the element entries.
+        for _ in 0..element_count {
+            elements.push(self.element_entry()?);
         }
+        debug!("(element_section::element_entries = {:?})", elements);
 
         // TODO
-        Ok(Section::Function(vec![]))
+        Ok(Section::Element(elements))
     }
 
     /// TODO: TEST
@@ -688,6 +656,7 @@ impl<'a> Parser<'a> {
         for _ in 0..body_count {
             function_bodies.push(self.function_body()?);
         }
+        debug!("(code_section::function_bodies = {:?})", function_bodies);
 
         // TODO
         Ok(Section::Code(function_bodies))
@@ -697,45 +666,39 @@ impl<'a> Parser<'a> {
     pub fn data_section(&mut self) -> ParserResult<Section> {
         debug!("-> data_section! <-");
         let cursor = self.cursor;
+        let mut data = vec![];
 
         // The length of the code section in bytes.
         let payload_len = get_value!(
             self.varuint32(),
             cursor,
-            IncompleteFunctionSection,
-            MalformedPayloadLengthInFunctionSection
+            IncompleteDataSection,
+            MalformedPayloadLengthInDataSection
         );
 
-        debug!("(function_section::payload_len = 0x{:x})", payload_len);
+        debug!("(data_section::payload_len = 0x{:x})", payload_len);
 
-        // Get the count of function entries,
-        let function_count = get_value!(
+        // Get the count of data entries,
+        let entry_count = get_value!(
             self.varuint32(),
             cursor,
-            IncompleteFunctionSection,
-            MalformedEntryCountInFunctionSection
+            IncompleteDataSection,
+            MalformedEntryCountInDataSection
         );
 
         debug!(
-            "(function_section::function_count = 0x{:x})",
-            function_count
+            "(data_section::function_count = 0x{:x})",
+            entry_count
         );
 
         // Consume the function entries.
-        for _ in 0..function_count {
-            // Index into the type section.
-            let type_index = get_value!(
-                self.varuint32(),
-                cursor,
-                IncompleteFunctionSection,
-                MalformedEntryInFunctionSection
-            );
-
-            debug!("(function_section::type_index = 0x{:x})", type_index);
+        for _ in 0..entry_count {
+            data.push(self.data_entry()?);
         }
+        debug!("(data_section::data_entries = {:?})", data);
 
         // TODO
-        Ok(Section::Function(vec![]))
+        Ok(Section::Data(data))
     }
 
     /******** IMPORTS ********/
@@ -774,7 +737,7 @@ impl<'a> Parser<'a> {
 
         // Get field name length
         let field_len = get_value!(
-            self.varint32(),
+            self.varuint32(),
             cursor,
             IncompleteImportEntry,
             MalformedFieldNameLengthInImportEntry
@@ -848,7 +811,7 @@ impl<'a> Parser<'a> {
     pub fn table_import(&mut self) -> ParserResult<ImportDesc> {
         debug!("-> table_import! <-");
         let cursor = self.cursor;
-        let element_type = int_to_type(match self.varint7() {
+        let element_type = Type::from(match self.varint7() {
             Ok(value) => {
                 // Must be anyfunc
                 if value != -0x10 {
@@ -940,7 +903,7 @@ impl<'a> Parser<'a> {
         debug!("-> global_import! <-");
         let cursor = self.cursor;
 
-        let content_type = int_to_type(get_value!(
+        let content_type = Type::from(get_value!(
             self.value_type(),
             cursor,
             IncompleteGlobalImport,
@@ -960,6 +923,105 @@ impl<'a> Parser<'a> {
         Ok(ImportDesc::Global {
             content_type,
             mutability,
+        })
+    }
+
+    /******** TABLE, MEMORY, GLOBAL ********/
+
+    /// TODO: TEST
+    pub fn table_entry(&mut self) -> ParserResult<Table> {
+        let cursor = self.cursor;
+
+        // Get element type.
+        let element_type = get_value!(
+            self.varint7(),
+            cursor,
+            IncompleteTableEntry,
+            MalformedElementTypeInTableEntry
+        );
+
+        // Check if type is not funtref.
+        if element_type != -0x10 {
+            return Err(ParserError {
+                kind: ErrorKind::InvalidElementTypeInTableEntry,
+                cursor,
+            });
+        }
+
+        // Get table limits.
+        let (minimum, maximum) = match self.limits() {
+            Ok(value) => value,
+            Err(ParserError { kind, .. }) => {
+                let err = match kind {
+                    ErrorKind::BufferEndReached => ErrorKind::IncompleteTableEntry,
+                    ErrorKind::MalformedFlagsInLimits => ErrorKind::MalformedFlagsInTableEntry,
+                    ErrorKind::MalformedMinimumInLimits => ErrorKind::MalformedMinimumInTableEntry,
+                    ErrorKind::MalformedMaximumInLimits => ErrorKind::MalformedMaximumInTableEntry,
+                    _ => ErrorKind::MalformedLimitsInTableEntry,
+                };
+
+                return Err(ParserError { kind, cursor });
+            }
+        };
+
+        Ok(Table { element_type: element_type.into(), minimum, maximum })
+    }
+
+    /// TODO: TEST
+    pub fn memory_entry(&mut self) -> ParserResult<Memory> {
+        let cursor = self.cursor;
+
+        // Get memory limits.
+        let (minimum, maximum) = match self.limits() {
+            Ok(value) => value,
+            Err(ParserError { kind, .. }) => {
+                let err = match kind {
+                    ErrorKind::BufferEndReached => ErrorKind::IncompleteMemoryEntry,
+                    ErrorKind::MalformedFlagsInLimits => ErrorKind::MalformedFlagsInMemoryEntry,
+                    ErrorKind::MalformedMinimumInLimits => ErrorKind::MalformedMinimumInMemoryEntry,
+                    ErrorKind::MalformedMaximumInLimits => ErrorKind::MalformedMaximumInMemoryEntry,
+                    _ => ErrorKind::MalformedLimitsInMemoryEntry,
+                };
+
+                return Err(ParserError { kind, cursor });
+            }
+        };
+
+        Ok(Memory { minimum, maximum })
+    }
+
+    /// TODO: TEST
+    pub fn global_entry(&mut self) -> ParserResult<Global> {
+        debug!("-> global_entry! <-");
+        let cursor = self.cursor;
+
+        // Get content type
+        let content_type = Type::from(get_value!(
+            self.value_type(),
+            cursor,
+            IncompleteGlobalEntry,
+            MalformedContentTypeInGlobalEntry
+        ));
+
+        debug!("(global_entry::content_type = {:?})", content_type);
+
+        // Get mutability
+        let mutability = get_value!(
+            self.varuint1(),
+            cursor,
+            IncompleteGlobalEntry,
+            MalformedMutabilityInGlobalEntry
+        );
+
+        debug!("(global_entry::mutability = {:?})", mutability);
+
+        // Consume instructions
+        let instructions = self.instructions()?;
+
+        Ok(Global {
+            content_type,
+            mutability,
+            instructions,
         })
     }
 
@@ -1009,7 +1071,7 @@ impl<'a> Parser<'a> {
             self.varuint32(),
             cursor,
             IncompleteExportEntry,
-            MalformedModuleNameLengthInExportEntry
+            MalformedExportIndexInExportEntry
         );
 
         debug!("export_entry::index = {:?}", index);
@@ -1034,6 +1096,52 @@ impl<'a> Parser<'a> {
         Ok(Export { name, desc })
     }
 
+    /******** ELEMENT ********/
+
+    /// TODO: TEST
+    pub fn element_entry(&mut self) -> ParserResult<Element> {
+        debug!("-> element_entry! <-");
+        let cursor = self.cursor;
+        let mut func_indices = vec![];
+
+        // Get table index.
+        let table_index = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteElementEntry,
+            MalformedTableIndexInElementEntry
+        );
+
+        debug!("(element_entry::table_index = 0x{:x})", table_index);
+
+        // Consume code.
+        let instructions = self.instructions()?;
+
+        // Get count of function indices.
+        let func_count = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteElementEntry,
+            MalformedFunctionCountInElementEntry
+        );
+
+        debug!("(element_entry::func_count = 0x{:x})", func_count);
+
+        // Consume function indices
+        for _ in 0..func_count {
+            let func_index = get_value!(
+                self.varuint32(),
+                cursor,
+                IncompleteElementEntry,
+                MalformedFunctionIndexInElementEntry
+            );
+
+            func_indices.push(func_index);
+        }
+
+        Ok(Element { table_index, instructions, func_indices })
+    }
+
     /******** CODE ********/
 
     /// TODO: TEST
@@ -1042,7 +1150,6 @@ impl<'a> Parser<'a> {
         debug!("-> function_body! <-");
         let cursor = self.cursor;
         let mut locals = vec![];
-        let mut instructions = vec![];
 
         // The length of the code section in bytes.
         let body_size = get_value!(
@@ -1059,7 +1166,7 @@ impl<'a> Parser<'a> {
 
         // Get count of locals.
         let local_count = get_value!(
-            self.varint32(),
+            self.varuint32(),
             cursor,
             IncompleteFunctionBody,
             MalformedBodySizeInFunctionBody
@@ -1072,23 +1179,19 @@ impl<'a> Parser<'a> {
             locals.push(self.local_entry()?);
         }
 
-        // Get the amount of bytes consumed for locals.
+        // Consume code.
+        let instructions = self.instructions()?;
+
+        // Get the amount of bytes consumed for locals and code.
         let diff = self.cursor - start_pos;
 
-        // Consume code.
-        for _ in (diff + 1)..(body_size as _) {
-            instructions = self.instructions()?;
+        // Check if the diff matches the body size
+        if (body_size as usize) != diff {
+            return Err(ParserError {
+                kind: ErrorKind::BodySizeDoesNotMatchContentOfFunctionBody,
+                cursor,
+            });
         }
-
-        // Get end byte.
-        let end_byte = get_end_byte!(
-            self.varint32(),
-            cursor,
-            IncompleteFunctionBody,
-            MalformedEndByteInFunctionBody
-        );
-
-        debug!("(function_body::end_byte = 0x{:x})", end_byte);
 
         Ok(Function {
             locals,
@@ -1105,21 +1208,21 @@ impl<'a> Parser<'a> {
         let count = get_value!(
             self.varuint32(),
             cursor,
-            IncompleteTypeSection,
+            IncompleteLocalEntry,
             MalformedCountInLocalEntry
         );
 
-        debug!("(function_body::count = 0x{:x})", count);
+        debug!("(local_entry::count = 0x{:x})", count);
 
         // Get type of the locals.
-        let local_type = int_to_type(get_value!(
+        let local_type = Type::from(get_value!(
             self.value_type(),
             cursor,
-            IncompleteTypeSection,
-            MalformedTypeInLocalEntry
+            IncompleteLocalEntry,
+            MalformedLocalTypeInLocalEntry
         ));
 
-        debug!("(function_body::local_type = {:?})", local_type);
+        debug!("(local_entry::local_type = {:?})", local_type);
 
         Ok(Local { count, local_type })
     }
@@ -1130,16 +1233,22 @@ impl<'a> Parser<'a> {
         let cursor = self.cursor;
         let mut operators = vec![];
 
-        let opcode = get_value!(
-            self.uint8(),
-            cursor,
-            IncompleteFunctionBody,
-            MalformedBodySizeInFunctionBody
-        );
-
         loop {
+            let opcode = get_value!(
+                self.uint8(),
+                cursor,
+                IncompleteExpression,
+                MalformedOpcodeInExpression
+            );
+
+            debug!("(instructions::opcode = 0x{:x})", opcode);
+
+            // If opcode is an end byte. Break!
+            if opcode == 0x0b {
+                break;
+            }
+
             operators.push(self.operator(opcode)?);
-            break;
         }
 
         Ok(operators)
@@ -1148,15 +1257,15 @@ impl<'a> Parser<'a> {
     /// TODO: TEST
     pub fn operator(&mut self, opcode: u8) -> ParserResult<Operator> {
         // Dispatch to the right
-        match opcode {
+        let operation = match opcode {
             // CONTROL FLOW
-            0x00 => unimplemented!(),
-            0x01 => unimplemented!(),
+            0x0b => Operator::End,
+            0x00 => Operator::Unreachable,
+            0x01 => Operator::Nop,
             0x02 => unimplemented!(),
             0x03 => unimplemented!(),
             0x04 => unimplemented!(),
             0x05 => unimplemented!(),
-            0x0b => unimplemented!(),
             0x0c => unimplemented!(),
             0x0d => unimplemented!(),
             0x0e => unimplemented!(),
@@ -1331,10 +1440,49 @@ impl<'a> Parser<'a> {
             0xbd => unimplemented!(),
             0xbe => unimplemented!(),
             0xbf => unimplemented!(),
-            _ => {}
-        }
+            _ => unimplemented!(),
+        };
 
-        Ok(Operator::Nop)
+        Ok(operation)
+    }
+
+    /******** DATA ********/
+
+    /// TODO: TEST
+    pub fn data_entry(&mut self) -> ParserResult<Data> {
+        debug!("-> data_entry! <-");
+        let cursor = self.cursor;
+
+        // Get memory index.
+        let memory_index = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteDataEntry,
+            MalformedTableIndexInDataEntry
+        );
+
+        debug!("(data_entry::memory_index = 0x{:x})", memory_index);
+
+        // Consume code.
+        let instructions = self.instructions()?;
+
+        // Get count of following bytes.
+        let byte_count = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteDataEntry,
+            MalformedByteCountInDataEntry
+        );
+
+        debug!("(data_entry::func_count = 0x{:x})", byte_count);
+
+        // Consume bytes.
+        let bytes = match self.eat_bytes(byte_count as _) {
+            Some(value) => value.to_vec(),
+            None => return Err(ParserError { kind: ErrorKind::IncompleteDataEntry, cursor }),
+        };
+
+        Ok(Data { memory_index, instructions, bytes })
     }
 
     /******** TYPES ********/
@@ -1392,7 +1540,7 @@ impl<'a> Parser<'a> {
 
         // Get param count.
         let param_count = get_value!(
-            self.varint32(),
+            self.varuint32(),
             cursor,
             IncompleteFunctionType,
             MalformedParamCountInFunctionType
@@ -1402,7 +1550,7 @@ impl<'a> Parser<'a> {
 
         // Get param types.
         for _ in 0..param_count {
-            let param_type = int_to_type(get_value!(
+            let param_type = Type::from(get_value!(
                 self.value_type(),
                 cursor,
                 IncompleteFunctionType,
@@ -1410,9 +1558,8 @@ impl<'a> Parser<'a> {
             ));
 
             params.push(param_type);
-
-            debug!("(func_type::param_type = {:?})", param_type);
         }
+        debug!("(func_type::param_types = {:?})", params);
 
         // Get return count.
         let return_count = get_value!(
@@ -1426,144 +1573,18 @@ impl<'a> Parser<'a> {
 
         // Get return types.
         for _ in 0..return_count {
-            let return_type = int_to_type(get_value!(
+            let return_type = Type::from(get_value!(
                 self.value_type(),
                 cursor,
                 IncompleteFunctionType,
                 MalformedParamTypeInFunctionType
             ));
 
-            params.push(return_type);
-
-            debug!("(func_type::return_type = {:?})", return_type);
+            returns.push(return_type);
         }
+        debug!("(func_type::return_types = {:?})", returns);
 
         Ok(Type::Func { params, returns })
-    }
-
-    /// TODO: TEST
-    pub fn table_type(&mut self) -> ParserResult<(Type, u32, Option<u32>)> {
-        let cursor = self.cursor;
-
-        // Get element type.
-        let element_type = get_value!(
-            self.varint32(),
-            cursor,
-            IncompleteTableType,
-            MalformedFuncrefInFunctionType
-        );
-
-        // Check if type is not funtref.
-        if element_type != 0x70 {
-            return Err(ParserError {
-                kind: ErrorKind::InvalidElementTypeInTableType,
-                cursor,
-            });
-        }
-
-        // Get table limits.
-        let (minimum, maximum) = match self.limits() {
-            Ok(value) => value,
-            Err(ParserError { kind, .. }) => {
-                let err = match kind {
-                    ErrorKind::BufferEndReached => ErrorKind::IncompleteTableType,
-                    ErrorKind::MalformedFlagsInLimits => ErrorKind::MalformedFlagsInTableType,
-                    ErrorKind::MalformedMinimumInLimits => ErrorKind::MalformedMinimumInTableType,
-                    ErrorKind::MalformedMaximumInLimits => ErrorKind::MalformedMaximumInTableType,
-                    _ => ErrorKind::MalformedLimitsInTableType,
-                };
-
-                return Err(ParserError { kind, cursor });
-            }
-        };
-
-        Ok((int_to_type(element_type), minimum, maximum))
-    }
-
-    /// TODO: TEST
-    pub fn memory_type(&mut self) -> ParserResult<(u32, Option<u32>)> {
-        let cursor = self.cursor;
-
-        // Get memory limits.
-        let limits = match self.limits() {
-            Ok(value) => value,
-            Err(ParserError { kind, .. }) => {
-                let err = match kind {
-                    ErrorKind::BufferEndReached => ErrorKind::IncompleteMemoryType,
-                    ErrorKind::MalformedFlagsInLimits => ErrorKind::MalformedFlagsInMemoryType,
-                    ErrorKind::MalformedMinimumInLimits => ErrorKind::MalformedMinimumInMemoryType,
-                    ErrorKind::MalformedMaximumInLimits => ErrorKind::MalformedMaximumInMemoryType,
-                    _ => ErrorKind::MalformedLimitsInMemoryType,
-                };
-
-                return Err(ParserError { kind, cursor });
-            }
-        };
-
-        Ok(limits)
-    }
-
-    /// TODO: TEST
-    pub fn global(&mut self) -> ParserResult<Global> {
-        debug!("-> global! <-");
-        let cursor = self.cursor;
-        let mut instructions = vec![];
-
-        // The length of the global in bytes.
-        let body_size = get_value!(
-            self.varuint32(),
-            cursor,
-            IncompleteGlobal,
-            MalformedBodySizeInGlobal
-        );
-
-        debug!("(global::global_size = {:?})", body_size);
-
-        // Start position of global type butes.
-        let start_pos = self.cursor;
-
-        // Get content type
-        let content_type = int_to_type(get_value!(
-            self.value_type(),
-            cursor,
-            IncompleteGlobal,
-            MalformedContentTypeInGlobal
-        ));
-
-        debug!("(global::content_type = {:?})", content_type);
-
-        // Get mutability
-        let mutability = get_value!(
-            self.varuint1(),
-            cursor,
-            IncompleteGlobal,
-            MalformedMutabilityInGlobal
-        );
-
-        debug!("(global::mutability = {:?})", mutability);
-
-        // Get init expr
-        // Get the amount of bytes consumed for content_type and mutability.
-        let diff = self.cursor - start_pos;
-
-        // Consume code.
-        for _ in (diff + 1)..(body_size as _) {
-            instructions = self.instructions()?;
-        }
-
-        // Get end byte.
-        let end_byte = get_end_byte!(
-            self.varint32(),
-            cursor,
-            IncompleteGlobal,
-            MalformedEndByteInGlobal
-        );
-
-        Ok(Global {
-            content_type,
-            mutability,
-            instructions,
-        })
     }
 
     /// TODO: TEST

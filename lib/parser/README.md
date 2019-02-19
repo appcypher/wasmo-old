@@ -8,6 +8,8 @@ _Resources for learning more about wasm binary:_
 ### THE WASM SPEC
 The [binary encoding document](https://github.com/WebAssembly/design/blob/master/BinaryEncoding.md) on wasm design repo is no longer maintained, the spec is supposed to be the source of truth but I was a bit skeptical about it at first because I didn't find the details I needed in time and I was confused by the statement "[all integers are encoded using the LEB128  variable-length integer encoding, in either unsigned or signed variant](https://webassembly.github.io/spec/core/binary/values.html#integers)". The binary doc had mentioned things like `uint8, uint16 and uint32`, but those were not mentioned anywhere in the spec. I later came across the [byte section](https://webassembly.github.io/spec/core/binary/values.html#bytes) and that was the `uint8, uint16 and uint32` I was looking for.
 
+I have an issue with some aspects of wasm space and one of it is that `code section` contains `function_bodies` and thes `function_bodies` start with a varuint32 `body_size` which signifies the entire length of the body. The instructions included. However for global, data and element sections, the entries don't start with a `body_size` representing the length of the enire entry. So to know the end of the instruction section, you have to reach an `end_byte`. Alright, but the instructions should have been placed last in the entry so that one can get other relevant information about an entry.
+
 ### TODO
 - [ ] Finish instruction parsing
 - [ ] Complete other sections (table, memory, global, export, start, element, data)
@@ -189,23 +191,23 @@ types       | varuint32* (type indices of functions)
 fields      | type
 :-----------|:------
 count       | varuint32
-types       | table_type*
+entries     | table_entry*
 
 ### MEMORY SECTION
 fields      | type
 :-----------|:------
 count       | varuint32
-types       | memory_type*
+entries       | memory_entry*
 
 ### GLOBAL SECTION
 fields      | type
 :-----------|:------
 count       | varuint32
-types       | global*
+entries     | global_entry*
 
-- GLOBAL
+- GLOBAL ENTRY
 
-    ### GLOBAL_TYPE
+    ### GLOBAL_ENTRY
     fields        | type
     :-------------|:------
     content_type  | value_type
@@ -217,7 +219,7 @@ types       | global*
 fields      | type
 :-----------|:------
 count       | varuint32  (entry count)
-entries     | import_entry*
+entries     | export_entry*
 
 ### EXPORT_ENTRY
 fields      | type
@@ -228,23 +230,25 @@ kind        | external_kind
 index       | varuint32
 
 ### START SECTION
-fields      | type
-:-----------|:------
-start_idx   | varuint32
+fields           | type
+:----------------|:------
+function_index   | varuint32
 
 ### ELEMENT SECTION
 fields      | type
 :-----------|:------
 count       | varuint32  (entry count)
-entries     | import_entry*
+entries     | element_entry*
 
-### ELEMENT_ENTRY
-fields       | type
-:------------|:------
-index        | varuint32
-expr         | byte*
-func_len     | varuint32
-func_indices | varuint32*
+- ELEMENT ENTRY
+
+    ### ELEMENT_ENTRY
+    fields       | type
+    :------------|:------
+    table_index  | varuint32
+    expr         | byte*
+    func_count   | varuint32
+    func_indices | varuint32*
 
 ### CODE SECTION
 fields      | type
@@ -507,15 +511,17 @@ end         | byte [0x0b]
 fields      | type
 :-----------|:------
 count       | varuint32  (entry count)
-entries     | import_entry*
+entries     | data_entry*
 
-### DATA_ENTRY
-fields       | type
-:------------|:------
-index        | varuint32
-expr         | byte*
-byte_len     | varuint32
-bytes        | byte*
+- DATA ENTRY
+
+        ### DATA_ENTRY
+        fields       | type
+        :------------|:------
+        memory_index | varuint32
+        expr         | byte*
+        byte_len     | varuint32
+        bytes        | byte*
 
 -----------------------------
 

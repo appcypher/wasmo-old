@@ -28,7 +28,7 @@ macro_rules! get_end_byte {
                 // Check if end byte is correct.
                 if value != 0x0b {
                     return Err(ParserError {
-                        kind: ErrorKind::MalformedEndByteInFunctionBody,
+                        kind: ErrorKind::MalformedEndByteInExpression,
                         cursor: $cursor,
                     });
                 }

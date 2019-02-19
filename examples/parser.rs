@@ -1,7 +1,10 @@
 use wasmlite_parser::parser::Parser;
 
-use wasmlite::wasm_codes::function_with_locals_only;
+use wasmlite::wasm_codes::{
+    function_with_locals_only,
+    function_with_nop,
+};
 
 fn main() {
-    Parser::new(&function_with_locals_only()).module().unwrap();
+    Parser::new(&function_with_nop()).module().unwrap();
 }
