@@ -1,21 +1,32 @@
-## EMSCRIPTEN HOST APIs
+## HOST DATA AND IMPORTS
 This document describes how Emscripten host APIs are created
 
-### GENERATE EMSCRIPTEN HOST DATA
-```rust
+### GENERATE EMSCRIPTEN IMPORTS
+##### IMPORTS
+```kotlin
+type Imports = Dict[String, Dict[String, HostData]]
+```
+
+##### HOST DATA
+```kotlin
 enum HostData {
-    // Addresses and descriptions
-    HostTable { ... },
-    HostFunction { ... },
+    HostTable { addr, desc },
+    HostFunction { addr, desc },
     ..
 }
+```
 
-type EmscriptenHostData {
-    imports_desc: ImportsDescription,
-    data: Dict[String, Dict[String, HostData]],
+##### HOST ABI
+```kotlin
+enum HostABI {
+    Emscripten,
+    Wasabi,
 }
+```
 
-fun init(imports_desc: ImportsDescription) -> EmscriptenHostData {
+##### HOST IMPORTS GENERATION
+```kotlin
+fun create_imports(abi: HostABI, import_descs: ImportDescriptions) -> Imports {
     // Create memories based on imports description
     // ...
 
@@ -28,37 +39,36 @@ fun init(imports_desc: ImportsDescription) -> EmscriptenHostData {
     // Add known functions
     // ...
 }
-
-fun generate_imports(host_data: EmscriptenHostData) -> Imports {
-    // Create imports out of host_data.data.
-}
 ```
 
-```rust
-let imports
+##### USAGE
+```swift
+let module = compile(wasm_binary, options)
 
-if api == HostAPI.Emscripten {
-    // Contains necessary emcripten APIs needed by a wasm instance
-    let emscripten_host_data = EmscriptenHostData(module.imports_desc)
-    imports = emscripten_host_data.generate_imports()
-}
+let emscripten_imports = create_imports(HostABI.Emscripten, module.descs.imports)
+
+let instance = instantiate(module, emscripten_imports) // Addresses are cloned
 ```
 
 
-### EMSCRIPTEN HOST FUNCTIONS AND ABI
+### HOST FUNCTIONS AND ABI
 ```rust
 // mkdir
 fun ___syscall39(which: CInt, varargs: CInt, var instance: Instance) -> CInt {
     debug!("${___syscall39.name} ${which}")
+
     let { pathname, mode } = get_varargs!(varargs, instance, { @pathname, mode })
-    unsafe { mkdir(pathname_addr, mode as _) }
+
+    unsafe {
+        mkdir(pathname_addr, mode as _)
+    }
 }
 ```
 
-### EMSCRIPTEN ACCESSING GUEST FUNCTIONS
+### ACCESSING GUEST EXPORTS
 Performance can be improved with host binding implementation.
 
-```rust 
+```rust
 // copy_cstr_into_instance
 fun copy_cstr_into_instance(str: *CChar, var instance: Instance) -> U32 {
     unsafe {
@@ -88,7 +98,7 @@ fun get_memory_addr_0(var instance: Instance) -> *U8 {
 }
 
 // write_to_buf
-fun write_to_buf(str: *CChar, buf: U32, max: U32, var instance: Instance) -> CInt {
+fun write_to_buf(str: *c_char, buf: U32, max: U32, var instance: Instance) -> CInt {
     unsafe {
         let buf_addr = get_memory_addr(buf, instance) as _;
 
@@ -101,3 +111,9 @@ fun write_to_buf(str: *CChar, buf: U32, max: U32, var instance: Instance) -> CIn
 }
 ```
 
+### HOW IMPORTS WORK
+- instantiate needs imports
+- emscripten host data uses module's imports description to generate some imports
+- some emscripten host data (functions) reference instance guest data
+- imports generated from emscripten host data
+- instantiate use generated imports
