@@ -1,7 +1,6 @@
 ## HOST DATA AND IMPORTS
-This document describes how Emscripten host APIs are created
+This document describes how host data and imports arge generated
 
-### GENERATE EMSCRIPTEN IMPORTS
 ##### IMPORTS
 ```kotlin
 type Imports = Dict[String, Dict[String, HostData]]
