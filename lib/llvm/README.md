@@ -2,8 +2,9 @@
 - [ ] Generate module information
 - [ ] Generate simple functions and operations for test
 - [ ] Simple AOT compilation example
-- [ ] Simple JIT compilation example with ORC
-- [ ] Simple LazyJIT compilation example with ORC
+- [ ] Simple Regular compilation example
+- [ ] Simple Lazy compilation example with ORC
+- [ ] Simple REPL compilation example with ORC
 - [ ] Proper planning of module/ir memory management
 - [ ] Trap and checks integration (checks types)
 - [ ] Proper planning of wasm memory model (page reservation and guard page)

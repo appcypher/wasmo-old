@@ -106,12 +106,21 @@ let expression = module.add_expression(wasm_expression_binary, instance);
     - [x] preamble
     - [x] types
     - [x] imports
-    - [ ] local memories, tables, globals
-    - [ ] elems, data, globals
+    - [x] local memories, tables, globals
+    - [x] elems, data, globals
     - [ ] functions body
-    - [ ] exports (functions, tables, globals)
+    - [x] exports (functions, tables, globals)
+    - [ ] validation
+    - [ ] exhaustive unit tests and fuzz tests
 
 - [ ] Codegen
+    - [ ] basic llvm codegen
+    - [ ] basic llvm traps and checks
+    - [ ] basic AOT and Regular compilation
+    - [ ] basic memory and table impl
+    - [ ] basic table/call_indirect impl
+    - [ ] llvm codegen completion
+
 - [ ] Runtime
 - [ ] Compilation Strategies
 - [ ] Compilation Flags
