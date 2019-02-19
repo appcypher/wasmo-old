@@ -1,8 +1,12 @@
 This parser is designed to parse an entire wasm module and generate corresponding intermediate representation. It is not the best for parsing a wasm module in bits. For that, you may need  [wasmparser](https://github.com/yurydelendik/wasmparser.rs)
 
 _Resources for learning more about wasm binary:_
-- https:-github.com/WebAssembly/design/blob/master/BinaryEncoding.md
+- https://webassembly.github.io/spec/
+- https://github.com/WebAssembly/design/blob/master/BinaryEncoding.md
 - https://github.com/sunfishcode/wasm-reference-manual/blob/master/WebAssembly.md
+
+### THE WASM SPEC
+The [binary encoding document](https://github.com/WebAssembly/design/blob/master/BinaryEncoding.md) on wasm design repo is no longer maintained, the spec is supposed to be the source of truth but I was a bit skeptical about it at first because I didn't find the details I needed in time and I was confused by the statement "[all integers are encoded using the LEB128  variable-length integer encoding, in either unsigned or signed variant](https://webassembly.github.io/spec/core/binary/values.html#integers)". The binary doc had mentioned things like `uint8, uint16 and uint32`, but those were not mentioned anywhere in the spec. I later came across the [byte section](https://webassembly.github.io/spec/core/binary/values.html#bytes) and that was the `uint8, uint16 and uint32` I was looking for.
 
 ### TODO
 - [ ] Finish instruction parsing
@@ -23,7 +27,7 @@ i32      | 0x7f  | -0x01
 i64      | 0x7e  | -0x02
 f32      | 0x7d  | -0x03
 f64      | 0x7c  | -0x04
-anyfunc  | 0x70  | -0x10
+funcref  | 0x70  | -0x10
 func     | 0x60  | -0x20
 ()       | 0x40  | -0x40
 
@@ -57,7 +61,7 @@ Data      | 0xB
 - value_type, ()
 
 ### ELEM_TYPE
-- any_func
+- funcref
 
 ### FUNC_TYPE
 fields        | type
@@ -66,18 +70,18 @@ form          | varint7
 param_count   | varuint32
 param_types   | value_type*
 return_count  | varuint1 (to know if return type is present)
-return_type   | valuetype?
+return_type   | valuetype? // TODO: multiple return types
 
 ### TABLE_TYPE
 fields        | type
 :-------------|:------
 element_type  | elem_type
-limits        | resizable_limit
+limits        | limits
 
 ### MEMORY_TYPE
 fields        | type
 :-------------|:------
-limits        | resizable_limit
+limits        | limits
 
 ### GLOBAL_TYPE
 fields        | type
@@ -89,7 +93,7 @@ mutability    | varuint1
 fields        | type
 :-------------|:------
 flags         | varuint1 (to know if maximum is present)
-initial       | varuint32
+minimum       | varuint32
 maximum       | varuint32?
 
 ### INIT_EXPR
@@ -126,8 +130,8 @@ Global      | 0x6
 Export      | 0x7
 Start       | 0x8
 Element     | 0x9
-Code        | 0x10
-Data        | 0x11
+Code        | 0xA
+Data        | 0xB
 
 ### TYPE SECTION
 fields      | type
@@ -145,12 +149,13 @@ entries     | import_entry*
 fields      | type
 :-----------|:------
 module_len  | varuint32
-module_str  | bytes
+module_name  | byte*
 field_len   | varuint32
-field_str   | bytes
+field_name   | byte*
 kind        | external_kind
+import      | import_type
 
-- IMPORTS
+- IMPORT_TYPE
 
     NOTE: While function imports reuse declarations from the type section, other types of import don't.
 
@@ -180,11 +185,66 @@ fields      | type
 count       | varuint32
 types       | varuint32* (type indices of functions)
 
---------------------------------------
+### TABLE SECTION
+fields      | type
+:-----------|:------
+count       | varuint32
+types       | table_type*
 
-SKIP
+### MEMORY SECTION
+fields      | type
+:-----------|:------
+count       | varuint32
+types       | memory_type*
 
---------------------------------------
+### GLOBAL SECTION
+fields      | type
+:-----------|:------
+count       | varuint32
+types       | global*
+
+- GLOBAL
+
+    ### GLOBAL_TYPE
+    fields        | type
+    :-------------|:------
+    content_type  | value_type
+    mutability    | varuint1
+    code          | byte*
+    end           | byte [0x0b]
+
+### EXPORT SECTION
+fields      | type
+:-----------|:------
+count       | varuint32  (entry count)
+entries     | import_entry*
+
+### EXPORT_ENTRY
+fields      | type
+:-----------|:------
+name_len    | varuint32
+name        | byte*
+kind        | external_kind
+index       | varuint32
+
+### START SECTION
+fields      | type
+:-----------|:------
+start_idx   | varuint32
+
+### ELEMENT SECTION
+fields      | type
+:-----------|:------
+count       | varuint32  (entry count)
+entries     | import_entry*
+
+### ELEMENT_ENTRY
+fields       | type
+:------------|:------
+index        | varuint32
+expr         | byte*
+func_len     | varuint32
+func_indices | varuint32*
 
 ### CODE SECTION
 fields      | type
@@ -441,6 +501,21 @@ end         | byte [0x0b]
         i64.reinterpret/f64 | 0xbd  |
         f32.reinterpret/i32 | 0xbe  |
         f64.reinterpret/i64 | 0xbf  |
+
+
+### DATA SECTION
+fields      | type
+:-----------|:------
+count       | varuint32  (entry count)
+entries     | import_entry*
+
+### DATA_ENTRY
+fields       | type
+:------------|:------
+index        | varuint32
+expr         | byte*
+byte_len     | varuint32
+bytes        | byte*
 
 -----------------------------
 

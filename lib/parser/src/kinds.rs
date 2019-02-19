@@ -50,11 +50,24 @@ pub enum ErrorKind {
     MalformedPayloadLengthInCodeSection,
     MalformedBodyCountInCodeSection,
     MalformedBodyInCodeSection,
+    // Table Section
+    IncompleteTableSection,
+    MalformedPayloadLengthInTableSection,
+    MalformedEntryCountInTableSection,
+    MalformedEntryInTableSection,
+    // Export Section
+    IncompleteExportSection,
+    MalformedPayloadLengthInExportSection,
+    MalformedEntryCountInExportSection,
+    // Start Section
+    IncompleteStartSection,
+    MalformedPayloadLengthInStartSection,
+    MalformedEntryCountInStartSection,
     // Import Entry
     IncompleteImportEntry,
-    MalformedModuleLengthInImportEntry,
+    MalformedModuleNameLengthInImportEntry,
     ModuleStringDoesNotMatchModuleLengthInImportEntry,
-    MalformedFieldLengthInImportEntry,
+    MalformedFieldNameLengthInImportEntry,
     FieldStringDoesNotMatchFieldLengthInImportEntry,
     MalformedImportTypeInImportEntry,
     InvalidImportTypeInImportEntry,
@@ -66,15 +79,15 @@ pub enum ErrorKind {
     IncompleteTableImport,
     MalformedElementTypeInTableImport,
     MalformedFlagsInTableImport,
-    MalformedInitialInTableImport,
+    MalformedMinimumInTableImport,
     MalformedMaximumInTableImport,
-    MalformedResizableLimitInTableImport,
+    MalformedLimitsInTableImport,
     // Memory Import
     IncompleteMemoryImport,
     MalformedFlagsInMemoryImport,
-    MalformedInitialInMemoryImport,
+    MalformedMinimumInMemoryImport,
     MalformedMaximumInMemoryImport,
-    MalformedResizableLimitInMemoryImport,
+    MalformedLimitsInMemoryImport,
     // Global Import
     IncompleteGlobalImport,
     MalformedContentTypeInGlobalImport,
@@ -86,11 +99,11 @@ pub enum ErrorKind {
     // Local Entry
     MalformedCountInLocalEntry,
     MalformedTypeInLocalEntry,
-    // Resizable Limits
-    IncompleteResizableLimits,
-    MalformedFlagsInResizableLimits,
-    MalformedInitialInResizableLimits,
-    MalformedMaximumInResizableLimits,
+    // Limits
+    IncompleteLimits,
+    MalformedFlagsInLimits,
+    MalformedMinimumInLimits,
+    MalformedMaximumInLimits,
     // Function Type
     IncompleteFunctionType,
     MalformedParamCountInFunctionType,
@@ -99,6 +112,32 @@ pub enum ErrorKind {
     MalformedReturnCountInFunctionType,
     MalformedReturnTypeInFunctionType,
     ReturnTypeDoesNotMatchReturnCountInFunctionType,
+    // Table Type
+    IncompleteTableType,
+    InvalidElementTypeInTableType,
+    MalformedLimitsInTableType,
+    MalformedMaximumInTableType,
+    MalformedMinimumInTableType,
+    MalformedFlagsInTableType,
+    // Memory Type
+    IncompleteMemoryType,
+    MalformedLimitsInMemoryType,
+    MalformedMaximumInMemoryType,
+    MalformedMinimumInMemoryType,
+    MalformedFlagsInMemoryType,
+    // Global
+    IncompleteGlobal,
+    MalformedEndByteInGlobal,
+    MalformedContentTypeInGlobal,
+    MalformedBodySizeInGlobal,
+    MalformedMutabilityInGlobal,
+    // Export Entry
+    IncompleteExportEntry,
+    // MalformedPayloadLengthInExportSection,
+    // MalformedEntryCountInExportSection,
+    MalformedNameLengthInExportEntry,
+    MalformedImportTypeInExportEntry,
+    InvalidExportTypeInExportEntry,
 }
 
 #[derive(Debug)]
