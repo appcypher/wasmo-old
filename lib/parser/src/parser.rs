@@ -1,39 +1,66 @@
-use std::collections::HashMap;
-use wasmlite_llvm::module::Module;
+#[macro_use]
+use std::str;
 use crate::{
+    macros,
     errors::ParserError,
+    ir::{
+        Export, ExportDesc, Function, Global, Import, ImportDesc, Local, Memory, Module, Operator,
+        Section, Table, Type, Element, Data
+    },
+    kinds::{ErrorKind, SectionKind},
+    validation::validate_section_exists,
 };
+use wasmlite_utils::*;
 
+// TODO
+//  - Improve error reporting.
+
+pub type ParserResult<T> = Result<T, ParserError>;
+
+/// A WebAssembly module parser.
+///
+/// Notes
+/// - Just like with body_size in function body. payload_len should be used to determine if section content stay within payload range
 #[derive(Debug, Clone)]
-/// A single-pass codegen parser.
-/// Generates a Module as it deserializes a wasm binary.
 pub struct Parser<'a> {
-    code: &'a Vec<u8>, // The wasm binary to parse
+    code: &'a [u8],                        // The wasm binary to parse
     cursor: usize, // Used to track the current byte position as the parser advances.
-    module: Module, // The generated module
+    pub(super) sections_consumed: Vec<u8>, // Holds the section ids that have been consumed. Section types cannot occur more than once.
 }
 
 /// Contains the implementation of parser
-impl <'a> Parser<'a> {
+impl<'a> Parser<'a> {
     /// Creates new parser
-    pub fn new(code: &'a Vec<u8>) -> Self {
+    pub fn new(code: &'a [u8]) -> Self {
         Parser {
             code,
             cursor: 0, // cursor starts at first byte
-            module: Module::new(),
+            sections_consumed: vec![],
         }
     }
 
+    /// Sets the parser's cursor.
+    pub(super) fn set_cursor(&mut self, cursor: usize) {
+        self.cursor = cursor;
+    }
+
+    /// Pushes an id into the parser's sections_consumed.
+    pub(super) fn push_section_id(&mut self, section_id: &u8) {
+        self.sections_consumed.push(*section_id);
+    }
+
     /// TODO: TEST
-    /// Generates the `module` object by calling functions
-    /// that parse a wasm module.
-    pub fn module(&mut self) -> Result<(), (ParserError, usize)> {
-        println!("\n=== module! ===");
+    /// Generates an IR rpresenting a parsed wasm module.
+    pub fn module(&mut self) -> ParserResult<()> {
+        debug!("-> module! <-");
 
-        // Consume preamble. Panic if it returns an error.
-        self.module_preamble().unwrap();
+        // Consume preamble.
+        self.module_preamble()?;
 
-        self.module_sections().unwrap(); // Optional
+        // TODO: Module can stop here.
+        let sections = self.sections().unwrap();
+
+        debug!("(module::sections = {:#?})", sections);
 
         Ok(())
     }
@@ -41,368 +68,706 @@ impl <'a> Parser<'a> {
     /// TODO: TEST
     /// Checks if the following bytes are expected
     /// wasm preamble bytes.
-    pub fn module_preamble(&mut self) -> Result<(), (ParserError, usize)> {
-        println!("\n=== module_preamble! ===");
-        let start_position = self.cursor;
+    pub fn module_preamble(&mut self) -> ParserResult<()> {
+        debug!("-> module_preamble! <-");
+        let cursor = self.cursor;
 
         // Consume magic number.
         let magic_no = match self.uint32() {
             Ok(value) => {
                 // Magic number must be `\0asm`
-                if value != 0x6d736100 {
-                    return Err((ParserError::InvalidMagicNumber, start_position));
+                if value != 0x6d73_6100 {
+                    return Err(ParserError {
+                        kind: ErrorKind::InvalidMagicNumber,
+                        cursor,
+                    });
                 }
                 value
-            },
+            }
             Err(error) => {
-                //
-                if error == ParserError::BufferEndReached {
-                    return Err((ParserError::IncompletePreamble, start_position));
+                if error == ErrorKind::BufferEndReached {
+                    return Err(ParserError {
+                        kind: ErrorKind::IncompletePreamble,
+                        cursor,
+                    });
                 } else {
-                    return Err((ParserError::InvalidVersionNumber, start_position));
+                    return Err(ParserError {
+                        kind: ErrorKind::InvalidVersionNumber,
+                        cursor,
+                    });
                 }
-            },
+            }
         };
 
-        println!("\n::module_preamble::magic_no = 0x{:08x}", magic_no);
+        debug!("(module_preamble::magic_no = 0x{:08x})", magic_no);
 
         // Consume version number.
         let version_no = match self.uint32() {
             Ok(value) => {
                 // Only version 0x01 supported for now.
                 if value != 0x1 {
-                    return Err((ParserError::MalformedVersionNumber, start_position));
+                    return Err(ParserError {
+                        kind: ErrorKind::MalformedVersionNumber,
+                        cursor,
+                    });
                 }
                 value
-            },
+            }
             Err(error) => {
-                //
-                if error == ParserError::BufferEndReached {
-                    return Err((ParserError::IncompletePreamble, start_position));
+                if error == ErrorKind::BufferEndReached {
+                    return Err(ParserError {
+                        kind: ErrorKind::IncompletePreamble,
+                        cursor,
+                    });
                 } else {
-                    return Err((ParserError::MalformedVersionNumber, start_position));
+                    return Err(ParserError {
+                        kind: ErrorKind::MalformedVersionNumber,
+                        cursor,
+                    });
                 }
-            },
+            }
         };
 
-        println!("\n::module_preamble::version_no = 0x{:08x}", version_no);
+        debug!("(module_preamble::version_no = 0x{:08x})", version_no);
 
         Ok(())
     }
 
     /// TODO: TEST
-    pub fn module_sections(&mut self) -> Result<(), (ParserError, usize)> {
-        println!("\n=== module_sections! ===");
+    pub fn sections(&mut self) -> ParserResult<Vec<Section>> {
+        debug!("-> module_sections! <-");
 
-        //
-        let mut sections_consumed = vec![];
+        let mut sections = vec![];
 
-        //
+        // Iterate and Consume the section
         loop {
-            let start_position = self.cursor;
-            //
+            let cursor = self.cursor;
+            // Get section id.
             let section_id = match self.varuint7() {
                 Ok(value) => value,
                 Err(error) => {
-                    //
-                    if error == ParserError::BufferEndReached {
+                    // Break loop when there is no more section to consume.
+                    if error == ErrorKind::BufferEndReached {
                         break;
                     } else {
-                        return Err((ParserError::MalformedSectionId, start_position));
+                        return Err(ParserError {
+                            kind: ErrorKind::MalformedSectionId,
+                            cursor,
+                        });
                     }
-                },
+                }
             };
 
-            //
-            if sections_consumed.contains(&section_id) {
-                return Err((ParserError::SectionAlreadyDefined, start_position));
-            } else {
-                sections_consumed.push(section_id);
+            // Validate that section id exists
+            validate_section_exists(self, section_id, cursor)?;
+
+            // Save id in list of sections consumed if not custpom section
+            if section_id != 0 {
+                self.push_section_id(&section_id);
             }
 
-            //
-            match section_id {
-                0x00 => self.custom_section()?,
-                0x01 => self.type_section()?,
-                0x02 => self.import_section()?,
-                _ => {
-                    return Err((ParserError::UnsupportedSection, start_position));
-                },
-            };
+            debug!(
+                "(module_sections::section code = {:?})",
+                SectionKind::from(section_id)
+            );
+
+            // Consume appropriate section based on section id.
+            sections.push(self.section(section_id)?);
         }
-        Ok(())
+
+        Ok(sections)
     }
 
+    /// Gets the next section id and payload.
+    /// Needed by reader
+    pub fn section_id(&mut self) -> ParserResult<u8> {
+        debug!("-> module_section_id! <-");
+        let cursor = self.cursor;
+
+        // Get section id.
+        let section_id = get_value!(
+            self.varuint7(),
+            cursor,
+            IncompleteSection,
+            MalformedSectionId
+        );
+
+        // Validate that section id exists.
+        validate_section_exists(self, section_id, cursor)?;
+
+        Ok(section_id)
+    }
+
+    /// Gets the next module section
+    pub fn section(&mut self, section_id: u8) -> ParserResult<Section> {
+        debug!("-> section! <-");
+        let cursor = self.cursor;
+
+        Ok(match section_id {
+            0x00 => self.custom_section()?,
+            0x01 => self.type_section()?,
+            0x02 => self.import_section()?,
+            0x03 => self.function_section()?,
+            0x04 => self.table_section()?,
+            0x05 => self.memory_section()?,
+            0x06 => self.global_section()?,
+            0x07 => self.export_section()?,
+            0x08 => self.start_section()?,
+            0x09 => self.element_section()?,
+            0x0A => self.code_section()?,
+            0x0B => self.data_section()?,
+            _ => {
+                return Err(ParserError {
+                    kind: ErrorKind::UnsupportedSection,
+                    cursor,
+                });
+            }
+        })
+    }
+
+    /******** SECTIONS ********/
+
     /// TODO: TEST
-    pub fn custom_section(&mut self) -> Result<(), (ParserError, usize)> {
-        println!("\n=== custom_section! ===");
-        let start_position = self.cursor;
+    /// TODO: Name section and linking section.
+    pub fn custom_section(&mut self) -> ParserResult<Section> {
+        debug!("-> custom_section! <-");
+        let cursor = self.cursor;
 
-        //
-        let payload_len = match self.varint32() {
-            Ok(value) => value,
-            Err(error) => {
-                //
-                if error == ParserError::BufferEndReached {
-                    return Err((ParserError::IncompleteCustomSection, start_position));
-                } else {
-                    return Err((ParserError::MalformedPayloadLengthInCustomSection, start_position));
-                }
-            }
-        };
+        // The length of the code section in bytes.
+        let payload_len = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteCustomSection,
+            MalformedPayloadLengthInCustomSection
+        );
 
-        //
-        let name_len = match self.varint32() {
-            Ok(value) => value,
-            Err(error) => {
-                //
-                if error == ParserError::BufferEndReached {
-                    return Err((ParserError::IncompleteCustomSection, start_position));
-                } else {
-                    return Err((ParserError::MalformedEntryCountInTypeSection, start_position));
-                }
-            }
-        };
+        // Get name length of custom section.
+        let name_len = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteCustomSection,
+            MalformedEntryCountInTypeSection
+        );
 
         {
             // TODO: Validate UTF-8
-            // Skip payload bytes
+            // Skip name bytes for now.
             let _name = match self.eat_bytes(name_len as _) {
                 Some(value) => value,
                 None => {
-                    return Err((ParserError::IncompleteCustomSection, start_position));
+                    return Err(ParserError {
+                        kind: ErrorKind::IncompleteCustomSection,
+                        cursor,
+                    });
                 }
             };
         }
 
-        // Skip payload bytes
+        // Skip payload bytes as well for now.
         let _payload_data = match self.eat_bytes(payload_len as _) {
             Some(value) => value,
             None => {
-                return Err((ParserError::IncompleteCustomSection, start_position));
+                return Err(ParserError {
+                    kind: ErrorKind::IncompleteCustomSection,
+                    cursor,
+                });
             }
         };
 
-        Ok(())
+        Ok(Section::Custom)
     }
 
     /// TODO: TEST
-    pub fn type_section(&mut self) -> Result<(), (ParserError, usize)> {
-        println!("\n=== type_section! ===");
-        let start_position = self.cursor;
+    pub fn type_section(&mut self) -> ParserResult<Section> {
+        debug!("-> type_section! <-");
+        let cursor = self.cursor;
+        let mut func_types = vec![];
 
-        //
-        let payload_len = match self.varuint32() {
-            Ok(value) => value,
-            Err(error) => {
-                //
-                if error == ParserError::BufferEndReached {
-                    return Err((ParserError::IncompleteTypeSection, start_position));
-                } else {
-                    return Err((ParserError::MalformedPayloadLengthInTypeSection, start_position));
-                }
-            }
-        };
+        // The length of the code section in bytes.
+        let payload_len = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteTypeSection,
+            MalformedPayloadLengthInTypeSection
+        );
 
-        println!("\n::type_section::payload_len = 0x{:x}", payload_len);
+        debug!("(type_section::payload_len = 0x{:x})", payload_len);
 
-        //
-        let entry_count = match self.varuint32() {
-            Ok(value) => value,
-            Err(error) => {
-                //
-                if error == ParserError::BufferEndReached {
-                    return Err((ParserError::IncompleteTypeSection, start_position));
-                } else {
-                    return Err((ParserError::MalformedEntryCountInTypeSection, start_position));
-                }
-            }
-        };
+        // Get the count of type entries.
+        let entry_count = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteTypeSection,
+            MalformedEntryCountInTypeSection
+        );
 
-        println!("\n::type_section::entry_count = 0x{:x}", entry_count);
+        debug!("(type_section::entry_count = 0x{:x})", entry_count);
 
-        //
-        for i in 0..entry_count {
-            let type_id = match self.varint7() {
-                Ok(value) => value,
-                Err(error) => {
-                    //
-                    if error == ParserError::BufferEndReached {
-                        return Err((ParserError::EntriesDoNotMatchEntryCountInTypeSection, start_position));
-                    } else {
-                        return Err((ParserError::MalformedTypeInTypeSection, start_position));
-                    }
-                },
-            };
+        // Consume the type entries.
+        for _ in 0..entry_count {
+            let type_id = get_value!(
+                self.varint7(),
+                cursor,
+                EntriesDoNotMatchEntryCountInTypeSection,
+                MalformedTypeInTypeSection
+            );
 
-            println!("\n::type_section::type_id = {:?}", type_id);
+            debug!("(type_section::type_id = {:?})", type_id);
 
-            match type_id {
+            // Type must be a func type.
+            let func_type = match type_id {
                 -0x20 => self.func_type()?,
                 _ => {
-                    return Err((ParserError::UnsupportedTypeInTypeSection, start_position));
-                },
+                    return Err(ParserError {
+                        kind: ErrorKind::UnsupportedTypeInTypeSection,
+                        cursor,
+                    });
+                }
             };
+
+            func_types.push(func_type);
         }
 
-        Ok(())
+        // TODO
+        Ok(Section::Type(func_types))
     }
 
     /// TODO: TEST
-    pub fn import_section(&mut self) -> Result<(), (ParserError, usize)> {
-        println!("\n=== import_section! ===");
-        let start_position = self.cursor;
+    pub fn import_section(&mut self) -> ParserResult<Section> {
+        debug!("-> import_section! <-");
+        let cursor = self.cursor;
+        let mut imports = vec![];
 
-        //
-        let payload_len = match self.varuint32() {
-            Ok(value) => value,
-            Err(error) => {
-                //
-                if error == ParserError::BufferEndReached {
-                    return Err((ParserError::IncompleteTypeSection, start_position));
-                } else {
-                    return Err((ParserError::MalformedPayloadLengthInTypeSection, start_position));
-                }
-            }
-        };
-        println!("\n::import_section::payload_len = 0x{:x}", payload_len);
+        // The length of the code section in bytes.
+        let payload_len = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteImportSection,
+            MalformedPayloadLengthInImportSection
+        );
 
-        //
-        let entry_count = match self.varuint32() {
-            Ok(value) => value,
-            Err(error) => {
-                //
-                if error == ParserError::BufferEndReached {
-                    return Err((ParserError::IncompleteTypeSection, start_position));
-                } else {
-                    return Err((ParserError::MalformedEntryCountInTypeSection, start_position));
-                }
-            }
-        };
+        debug!("(import_section::payload_len = 0x{:x})", payload_len);
 
-        println!("\n::import_section::entry_count = 0x{:x}", entry_count);
+        // Get the count of import entries.
+        let entry_count = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteImportSection,
+            MalformedEntryCountInImportSection
+        );
 
-        //
-        for i in 0..entry_count {
-            self.import_entry()?;
+        debug!("(import_section::entry_count = 0x{:x})", entry_count);
+
+        // Consume the import entries.
+        for _ in 0..entry_count {
+            imports.push(self.import_entry()?);
         }
+        debug!("(import_section::import_entries = {:?})", imports);
 
-        Ok(())
+        // TODO
+        Ok(Section::Import(imports))
     }
 
     /// TODO: TEST
-    pub fn function_section(&mut self) -> Result<(), (ParserError, usize)> {
-        println!("\n=== import_section! ===");
-        let start_position = self.cursor;
+    pub fn function_section(&mut self) -> ParserResult<Section> {
+        debug!("-> function_section! <-");
+        let cursor = self.cursor;
+        let mut type_indices = vec![];
 
-        //
-        let payload_len = match self.varuint32() {
-            Ok(value) => value,
-            Err(error) => {
-                //
-                if error == ParserError::BufferEndReached {
-                    return Err((ParserError::IncompleteTypeSection, start_position));
-                } else {
-                    return Err((ParserError::MalformedPayloadLengthInTypeSection, start_position));
-                }
-            }
-        };
-        println!("\n::import_section::payload_len = 0x{:x}", payload_len);
+        // The length of the code section in bytes.
+        let payload_len = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteFunctionSection,
+            MalformedPayloadLengthInFunctionSection
+        );
 
-        //
-        let entry_count = match self.varuint32() {
-            Ok(value) => value,
-            Err(error) => {
-                //
-                if error == ParserError::BufferEndReached {
-                    return Err((ParserError::IncompleteTypeSection, start_position));
-                } else {
-                    return Err((ParserError::MalformedEntryCountInTypeSection, start_position));
-                }
-            }
-        };
+        debug!("(function_section::payload_len = 0x{:x})", payload_len);
 
-        println!("\n::import_section::entry_count = 0x{:x}", entry_count);
+        // Get the count of function entries,
+        let function_count = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteFunctionSection,
+            MalformedEntryCountInFunctionSection
+        );
 
-        //
-        for i in 0..entry_count {
-            self.import_entry()?;
+        debug!(
+            "(function_section::function_count = 0x{:x})",
+            function_count
+        );
+
+        // Consume the function index entries.
+        for _ in 0..function_count {
+            let type_index = get_value!(
+                self.varuint32(),
+                cursor,
+                IncompleteFunctionSection,
+                MalformedEntryInFunctionSection
+            );
+
+            type_indices.push(type_index);
         }
+        debug!("(function_section::type_indices = {:?})", type_indices);
 
-        Ok(())
+        // TODO
+        Ok(Section::Function(type_indices))
     }
 
     /// TODO: TEST
-    pub fn import_entry(&mut self) -> Result<(), (ParserError, usize)> {
-        println!("\n=== import_entry! ===");
-        let start_position = self.cursor;
+    pub fn table_section(&mut self) -> ParserResult<Section> {
+        debug!("-> table_section! <-");
+        let cursor = self.cursor;
+        let mut tables = vec![];
 
-        //
-        let module_len = match self.varuint32() {
-            Ok(value) => value,
-            Err(error) => {
-                //
-                if error == ParserError::BufferEndReached {
-                    return Err((ParserError::IncompleteImportEntry, start_position));
-                } else {
-                    return Err((ParserError::MalformedModuleLengthInImportEntry, start_position));
-                }
-            }
-        };
+        // The length of the code section in bytes.
+        let payload_len = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteTableSection,
+            MalformedPayloadLengthInTableSection
+        );
 
-        println!("\n::import_entry::module_len = 0x{:x}", module_len);
+        debug!("(table_section::payload_len = 0x{:x})", payload_len);
+
+        // Get the count of table entries,
+        let table_count = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteTableSection,
+            MalformedEntryCountInTableSection
+        );
+
+        debug!("(table_section::table_count = 0x{:x})", table_count);
+
+        // Consume the function entries.
+        for _ in 0..table_count {
+            tables.push(self.table_entry()?);
+        }
+
+        debug!(
+                "(table_section::table_entries = {:?})",
+                tables
+            );
+
+        // TODO
+        Ok(Section::Table(tables))
+    }
+
+    /// TODO: TEST
+    pub fn memory_section(&mut self) -> ParserResult<Section> {
+        debug!("-> memory_section! <-");
+        let cursor = self.cursor;
+        let mut memories = vec![];
+
+        // The length of the code section in bytes.
+        let payload_len = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteMemorySection,
+            MalformedPayloadLengthInMemorySection
+        );
+
+        debug!("(memory_section::payload_len = 0x{:x})", payload_len);
+
+        // Get the count of memory entries.
+        let memory_count = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteMemorySection,
+            MalformedEntryCountInMemorySection
+        );
+
+        debug!("(memory_section::memory_count = 0x{:x})", memory_count);
+
+        // Consume the entries.
+        for _ in 0..memory_count {
+            memories.push(self.memory_entry()?);
+        }
+        debug!("(memory_section::memory_entries = {:?})", memories);
+
+        Ok(Section::Memory(memories))
+    }
+
+    /// TODO: TEST
+    pub fn global_section(&mut self) -> ParserResult<Section> {
+        debug!("-> global_section! <-");
+        let cursor = self.cursor;
+        let mut globals = vec![];
+
+        // The length of the global section in bytes.
+        let payload_len = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteGlobalSection,
+            MalformedPayloadLengthInGlobalSection
+        );
+
+        debug!("(global_section::payload_len = 0x{:x})", payload_len);
+
+        // Get the count of global entries,
+        let global_count = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteGlobalSection,
+            MalformedEntryCountInGlobalSection
+        );
+
+        debug!("(global_section::global_count = 0x{:x})", global_count);
+
+        // Consume the global entries.
+        for _ in 0..global_count {
+            globals.push(self.global_entry()?);
+        }
+        debug!("(global_section::global_entries = {:?})", globals);
+
+        Ok(Section::Global(globals))
+    }
+
+    /// TODO: TEST
+    pub fn export_section(&mut self) -> ParserResult<Section> {
+        debug!("-> export_section! <-");
+        let cursor = self.cursor;
+        let mut exports = vec![];
+
+        // The length of the export section in bytes.
+        let payload_len = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteExportSection,
+            MalformedPayloadLengthInExportSection
+        );
+
+        debug!("(export_section::payload_len = 0x{:x})", payload_len);
+
+        // Get the count of export entries.
+        let entry_count = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteExportSection,
+            MalformedEntryCountInExportSection
+        );
+
+        debug!("(export_section::entry_count = 0x{:x})", entry_count);
+
+        // Consume the export entries.
+        for _ in 0..entry_count {
+            exports.push(self.export_entry()?);
+        }
+        debug!("(export_section::export_entries = {:?})", exports);
+
+        // TODO
+        Ok(Section::Export(exports))
+    }
+
+    /// TODO: TEST
+    pub fn start_section(&mut self) -> ParserResult<Section> {
+        debug!("-> start_section! <-");
+        let cursor = self.cursor;
+
+        // The length of the code section in bytes.
+        let payload_len = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteStartSection,
+            MalformedPayloadLengthInStartSection
+        );
+
+        debug!("(start_section::payload_len = 0x{:x})", payload_len);
+
+        // Get the indes of the start function,
+        let function_index = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteStartSection,
+            MalformedFunctionIndexInStartSection
+        );
+
+        // TODO
+        Ok(Section::Start(function_index))
+    }
+
+    /// TODO: TEST
+    pub fn element_section(&mut self) -> ParserResult<Section> {
+        debug!("-> element_section! <-");
+        let cursor = self.cursor;
+        let mut elements = vec![];
+
+        // The length of the element section in bytes.
+        let payload_len = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteElementSection,
+            MalformedPayloadLengthInElementSection
+        );
+
+        debug!("(element_section::payload_len = 0x{:x})", payload_len);
+
+        // Get the count of element entries,
+        let element_count = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteElementSection,
+            MalformedEntryCountInElementSection
+        );
+
+        debug!(
+            "(element_section::element_count = 0x{:x})",
+            element_count
+        );
+
+        // Consume the element entries.
+        for _ in 0..element_count {
+            elements.push(self.element_entry()?);
+        }
+        debug!("(element_section::element_entries = {:?})", elements);
+
+        // TODO
+        Ok(Section::Element(elements))
+    }
+
+    /// TODO: TEST
+    pub fn code_section(&mut self) -> ParserResult<Section> {
+        debug!("-> code_section! <-");
+        let cursor = self.cursor;
+        let mut function_bodies = vec![];
+
+        // The length of the code section in bytes.
+        let payload_len = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteCodeSection,
+            MalformedPayloadLengthInCodeSection
+        );
+
+        debug!("(code_section::payload_len = 0x{:x})", payload_len);
+
+        // Get the count of function bodies.
+        let body_count = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteCodeSection,
+            MalformedBodyCountInCodeSection
+        );
+
+        debug!("(code_section::entry_count = 0x{:x})", body_count);
+
+        // Consume the function bodies.
+        for _ in 0..body_count {
+            function_bodies.push(self.function_body()?);
+        }
+        debug!("(code_section::function_bodies = {:?})", function_bodies);
+
+        // TODO
+        Ok(Section::Code(function_bodies))
+    }
+
+    /// TODO: TEST
+    pub fn data_section(&mut self) -> ParserResult<Section> {
+        debug!("-> data_section! <-");
+        let cursor = self.cursor;
+        let mut data = vec![];
+
+        // The length of the code section in bytes.
+        let payload_len = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteDataSection,
+            MalformedPayloadLengthInDataSection
+        );
+
+        debug!("(data_section::payload_len = 0x{:x})", payload_len);
+
+        // Get the count of data entries,
+        let entry_count = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteDataSection,
+            MalformedEntryCountInDataSection
+        );
+
+        debug!(
+            "(data_section::function_count = 0x{:x})",
+            entry_count
+        );
+
+        // Consume the function entries.
+        for _ in 0..entry_count {
+            data.push(self.data_entry()?);
+        }
+        debug!("(data_section::data_entries = {:?})", data);
+
+        // TODO
+        Ok(Section::Data(data))
+    }
+
+    /******** IMPORTS ********/
+
+    /// TODO: TEST
+    pub fn import_entry(&mut self) -> ParserResult<Import> {
+        debug!("-> import_entry! <-");
+        let cursor = self.cursor;
+        let mut module_name = String::new();
+        let mut field_name = String::new();
+
+        // Get module name length
+        let module_len = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteImportEntry,
+            MalformedModuleNameLengthInImportEntry
+        );
+
+        debug!("(import_entry::module_len = 0x{:x})", module_len);
 
         {
             // TODO: Validate UTF-8
-            let _module_str = match self.eat_bytes(module_len as _) {
-                Some(value) => value,
+            module_name = match self.eat_bytes(module_len as _) {
+                Some(value) => str::from_utf8(value).unwrap().into(),
                 None => {
-                    return Err((ParserError::IncompleteImportEntry, start_position));
+                    return Err(ParserError {
+                        kind: ErrorKind::IncompleteImportEntry,
+                        cursor,
+                    });
                 }
             };
 
-            println!("\n::import_entry::_module_str = {:?}", std::str::from_utf8(_module_str));
+            debug!("import_entry::_module_str = {:?}", module_name);
         }
 
-        //
-        let field_len = match self.varint32() {
-            Ok(value) => value,
-            Err(error) => {
-                //
-                if error == ParserError::BufferEndReached {
-                    return Err((ParserError::IncompleteImportEntry, start_position));
-                } else {
-                    return Err((ParserError::MalformedFieldLengthInImportEntry, start_position));
-                }
-            }
-        };
+        // Get field name length
+        let field_len = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteImportEntry,
+            MalformedFieldNameLengthInImportEntry
+        );
 
-        println!("\n::import_entry::field_len = 0x{:x}", field_len);
+        debug!("(import_entry::field_len = 0x{:x})", field_len);
 
         {
             // TODO: Validate UTF-8
-            let _field_str = match self.eat_bytes(field_len as _) {
-                Some(value) => value,
+            field_name = match self.eat_bytes(field_len as _) {
+                Some(value) => str::from_utf8(value).unwrap().into(),
                 None => {
-                    return Err((ParserError::IncompleteImportEntry, start_position));
+                    return Err(ParserError {
+                        kind: ErrorKind::IncompleteImportEntry,
+                        cursor,
+                    });
                 }
             };
 
-            println!("\n::import_entry::_field_str = {:?}", std::str::from_utf8(_field_str));
+            debug!("(import_entry::_field_str = {:?})", field_name);
         }
 
-        let external_kind =  match self.external_kind() {
-            Ok(value) => value,
-            Err(error) => {
-                if error == ParserError::BufferEndReached {
-                    return Err((ParserError::IncompleteImportEntry, start_position));
-                } else {
-                    return Err((ParserError::MalformedImportTypeInImportEntry, start_position));
-                }
-            }
-        };
+        let external_kind = get_value!(
+            self.external_kind(),
+            cursor,
+            IncompleteImportEntry,
+            MalformedImportTypeInImportEntry
+        );
 
-        match external_kind {
+        let desc = match external_kind {
             // Function import
             0x00 => self.function_import()?,
             // Table import
@@ -412,297 +777,832 @@ impl <'a> Parser<'a> {
             // Global import
             0x03 => self.global_import()?,
             _ => {
-                return Err((ParserError::InvalidImportTypeInImportEntry, start_position));
-            }
-        }
-
-        Ok(())
-    }
-
-    /// TODO: TEST
-    pub fn function_import(&mut self) -> Result<(), (ParserError, usize)> {
-        println!("\n=== function_import! ===");
-        let start_position = self.cursor;
-
-        // TODO: LLVM module construction
-        let type_index = match self.varuint32() {
-            // TODO. Validate type_index
-            Ok(value) => value,
-            Err(error) => {
-                //
-                if error == ParserError::BufferEndReached {
-                    return Err((ParserError::IncompleteFunctionImport, start_position));
-                } else {
-                    return Err((ParserError::MalformedTypeIndexInFunctionImport, start_position));
-                }
+                return Err(ParserError {
+                    kind: ErrorKind::InvalidImportTypeInImportEntry,
+                    cursor,
+                });
             }
         };
 
-        println!("\n::function_import::type_index = {:?}", type_index);
-
-        Ok(())
+        Ok(Import {
+            module_name,
+            field_name,
+            desc,
+        })
     }
 
     /// TODO: TEST
-    pub fn table_import(&mut self) -> Result<(), (ParserError, usize)> {
-        println!("\n=== table_import! ===");
-        let start_position = self.cursor;
+    pub fn function_import(&mut self) -> ParserResult<ImportDesc> {
+        debug!("-> function_import! <-");
+        let cursor = self.cursor;
+        let type_index = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteFunctionImport,
+            MalformedTypeIndexInFunctionImport
+        );
 
-        // TODO: LLVM module construction
-        let element_type = match self.varint7() {
+        debug!("(function_import::type_index = {:?})", type_index);
+
+        Ok(ImportDesc::Function { type_index })
+    }
+
+    /// TODO: TEST
+    pub fn table_import(&mut self) -> ParserResult<ImportDesc> {
+        debug!("-> table_import! <-");
+        let cursor = self.cursor;
+        let element_type = Type::from(match self.varint7() {
             Ok(value) => {
                 // Must be anyfunc
                 if value != -0x10 {
-                    return Err((ParserError::MalformedElementTypeInTableImport, start_position));
+                    return Err(ParserError {
+                        kind: ErrorKind::MalformedElementTypeInTableImport,
+                        cursor,
+                    });
                 }
                 value
-            },
+            }
             Err(error) => {
-                //
-                if error == ParserError::BufferEndReached {
-                    return Err((ParserError::IncompleteTableImport, start_position));
+                if error == ErrorKind::BufferEndReached {
+                    return Err(ParserError {
+                        kind: ErrorKind::IncompleteTableImport,
+                        cursor,
+                    });
                 } else {
-                    return Err((ParserError::MalformedElementTypeInTableImport, start_position));
+                    return Err(ParserError {
+                        kind: ErrorKind::MalformedElementTypeInTableImport,
+                        cursor,
+                    });
                 }
             }
-        };
+        });
 
-        println!("\n::table_import::element_type = {:?}", element_type);
+        debug!("(table_import::element_type = {:?})", element_type);
 
-        //
-        let (initial, maximum) = match self.resizable_limits() {
+        // Get limits
+        let (minimum, maximum) = match self.limits() {
             Ok(value) => value,
-            Err(error) => {
-                // TODO: LLVM module construction
-                let err = match error {
-                    (ParserError::BufferEndReached, _) => ParserError::IncompleteTableImport,
-                    (ParserError::MalformedFlagsInResizableLimits, _) => ParserError::MalformedFlagsInTableImport,
-                    (ParserError::MalformedInitialInResizableLimits, _) => ParserError::MalformedInitialInTableImport,
-                    (ParserError::MalformedMaximumInResizableLimits, _) => ParserError::MalformedMaximumInTableImport,
-                    (_, _) => ParserError::MalformedResizableLimitInTableImport,
+            Err(ParserError { kind, .. }) => {
+                let err = match kind {
+                    ErrorKind::BufferEndReached => ErrorKind::IncompleteTableImport,
+                    ErrorKind::MalformedFlagsInLimits => ErrorKind::MalformedFlagsInTableImport,
+                    ErrorKind::MalformedMinimumInLimits => ErrorKind::MalformedMinimumInTableImport,
+                    ErrorKind::MalformedMaximumInLimits => ErrorKind::MalformedMaximumInTableImport,
+                    _ => ErrorKind::MalformedLimitsInTableImport,
                 };
 
-                return Err((err, start_position))
+                return Err(ParserError { kind, cursor });
             }
         };
 
-        println!("\n::table_import::initial = {:?}", initial);
+        debug!("(table_import::minimum = {:?})", minimum);
 
-        println!("\n::table_import::maximum = {:?}", maximum);
+        debug!("(table_import::maximum = {:?})", maximum);
 
-        Ok(())
+        Ok(ImportDesc::Table(Table {
+            element_type,
+            minimum,
+            maximum,
+        }))
     }
 
     /// TODO: TEST
-    pub fn memory_import(&mut self) -> Result<(), (ParserError, usize)> {
-        println!("\n=== memory_import! ===");
-        let start_position = self.cursor;
+    pub fn memory_import(&mut self) -> ParserResult<ImportDesc> {
+        debug!("-> memory_import! <-");
+        let cursor = self.cursor;
 
-        //
-        let (initial, maximum) = match self.resizable_limits() {
+        // Get limits
+        let (minimum, maximum) = match self.limits() {
             Ok(value) => value,
-            Err(error) => {
-                /// TODO: LLVM module construction
-                let err = match error {
-                    (ParserError::BufferEndReached, _) => ParserError::IncompleteMemoryImport,
-                    (ParserError::MalformedFlagsInResizableLimits, _) => ParserError::MalformedFlagsInMemoryImport,
-                    (ParserError::MalformedInitialInResizableLimits, _) => ParserError::MalformedInitialInMemoryImport,
-                    (ParserError::MalformedMaximumInResizableLimits, _) => ParserError::MalformedMaximumInMemoryImport,
-                    (_, _) => ParserError::MalformedResizableLimitInMemoryImport,
+            Err(ParserError { kind, .. }) => {
+                let err = match kind {
+                    ErrorKind::BufferEndReached => ErrorKind::IncompleteMemoryImport,
+                    ErrorKind::MalformedFlagsInLimits => ErrorKind::MalformedFlagsInMemoryImport,
+                    ErrorKind::MalformedMinimumInLimits => {
+                        ErrorKind::MalformedMinimumInMemoryImport
+                    }
+                    ErrorKind::MalformedMaximumInLimits => {
+                        ErrorKind::MalformedMaximumInMemoryImport
+                    }
+                    _ => ErrorKind::MalformedLimitsInMemoryImport,
                 };
 
-                return Err((err, start_position))
+                return Err(ParserError { kind, cursor });
             }
         };
 
-        println!("\n::memory_import::initial = {:?}", initial);
+        debug!("(memory_import::minimum = {:?})", minimum);
 
-        println!("\n::memory_import::maximum = {:?}", maximum);
+        debug!("(memory_import::maximum = {:?})", maximum);
 
-        Ok(())
+        Ok(ImportDesc::Memory(Memory { minimum, maximum }))
     }
 
     /// TODO: TEST
-    pub fn global_import(&mut self) -> Result<(), (ParserError, usize)> {
-        println!("\n=== global_import! ===");
-        let start_position = self.cursor;
+    pub fn global_import(&mut self) -> ParserResult<ImportDesc> {
+        debug!("-> global_import! <-");
+        let cursor = self.cursor;
 
-        // TODO: LLVM module construction
-        let content_type = match self.value_type() {
+        let content_type = Type::from(get_value!(
+            self.value_type(),
+            cursor,
+            IncompleteGlobalImport,
+            MalformedContentTypeInGlobalImport
+        ));
+
+        debug!("(global_import::content_type = {:?})", content_type);
+        let mutability = get_value!(
+            self.varuint1(),
+            cursor,
+            IncompleteGlobalImport,
+            MalformedMutabilityInGlobalImport
+        );
+
+        debug!("(global_import::mutability = {:?})", mutability);
+
+        Ok(ImportDesc::Global {
+            content_type,
+            mutability,
+        })
+    }
+
+    /******** TABLE, MEMORY, GLOBAL ********/
+
+    /// TODO: TEST
+    pub fn table_entry(&mut self) -> ParserResult<Table> {
+        let cursor = self.cursor;
+
+        // Get element type.
+        let element_type = get_value!(
+            self.varint7(),
+            cursor,
+            IncompleteTableEntry,
+            MalformedElementTypeInTableEntry
+        );
+
+        // Check if type is not funtref.
+        if element_type != -0x10 {
+            return Err(ParserError {
+                kind: ErrorKind::InvalidElementTypeInTableEntry,
+                cursor,
+            });
+        }
+
+        // Get table limits.
+        let (minimum, maximum) = match self.limits() {
             Ok(value) => value,
-            Err(error) => {
-                //
-                if error == ParserError::BufferEndReached {
-                    return Err((ParserError::IncompleteGlobalImport, start_position));
-                } else {
-                    return Err((ParserError::MalformedContentTypeInGlobalImport, start_position));
-                }
+            Err(ParserError { kind, .. }) => {
+                let err = match kind {
+                    ErrorKind::BufferEndReached => ErrorKind::IncompleteTableEntry,
+                    ErrorKind::MalformedFlagsInLimits => ErrorKind::MalformedFlagsInTableEntry,
+                    ErrorKind::MalformedMinimumInLimits => ErrorKind::MalformedMinimumInTableEntry,
+                    ErrorKind::MalformedMaximumInLimits => ErrorKind::MalformedMaximumInTableEntry,
+                    _ => ErrorKind::MalformedLimitsInTableEntry,
+                };
+
+                return Err(ParserError { kind, cursor });
             }
         };
 
-        println!("\n::global_import::content_type = {:?}", content_type);
-
-        // TODO: LLVM module construction
-        let mutability = match self.varuint1() {
-            Ok(value) => value,
-            Err(error) => {
-                //
-                if error == ParserError::BufferEndReached {
-                    return Err((ParserError::IncompleteGlobalImport, start_position));
-                } else {
-                    return Err((ParserError::MalformedMutabilityInGlobalImport, start_position));
-                }
-            }
-        };
-
-        println!("\n::global_import::mutability = {:?}", mutability);
-
-        Ok(())
+        Ok(Table { element_type: element_type.into(), minimum, maximum })
     }
 
     /// TODO: TEST
-    pub fn resizable_limits(&mut self) -> Result<(u32, Option<u32>), (ParserError, usize)> {
-        println!("\n=== resizable_limits! ===");
-        let start_position = self.cursor;
+    pub fn memory_entry(&mut self) -> ParserResult<Memory> {
+        let cursor = self.cursor;
 
-        /// TODO: LLVM module construction
-        let flags = match self.varuint1() {
+        // Get memory limits.
+        let (minimum, maximum) = match self.limits() {
             Ok(value) => value,
-            Err(error) => {
-                //
-                if error == ParserError::BufferEndReached {
-                    return Err((ParserError::IncompleteResizableLimits, start_position));
-                } else {
-                    return Err((ParserError::MalformedFlagsInResizableLimits, start_position));
-                }
+            Err(ParserError { kind, .. }) => {
+                let err = match kind {
+                    ErrorKind::BufferEndReached => ErrorKind::IncompleteMemoryEntry,
+                    ErrorKind::MalformedFlagsInLimits => ErrorKind::MalformedFlagsInMemoryEntry,
+                    ErrorKind::MalformedMinimumInLimits => ErrorKind::MalformedMinimumInMemoryEntry,
+                    ErrorKind::MalformedMaximumInLimits => ErrorKind::MalformedMaximumInMemoryEntry,
+                    _ => ErrorKind::MalformedLimitsInMemoryEntry,
+                };
+
+                return Err(ParserError { kind, cursor });
             }
         };
 
-        /// TODO: LLVM module construction
-        let initial = match self.varuint32() {
-            Ok(value) => value,
-            Err(error) => {
-                //
-                if error == ParserError::BufferEndReached {
-                    return Err((ParserError::IncompleteResizableLimits, start_position));
-                } else {
-                    return Err((ParserError::MalformedInitialInResizableLimits, start_position));
+        Ok(Memory { minimum, maximum })
+    }
+
+    /// TODO: TEST
+    pub fn global_entry(&mut self) -> ParserResult<Global> {
+        debug!("-> global_entry! <-");
+        let cursor = self.cursor;
+
+        // Get content type
+        let content_type = Type::from(get_value!(
+            self.value_type(),
+            cursor,
+            IncompleteGlobalEntry,
+            MalformedContentTypeInGlobalEntry
+        ));
+
+        debug!("(global_entry::content_type = {:?})", content_type);
+
+        // Get mutability
+        let mutability = get_value!(
+            self.varuint1(),
+            cursor,
+            IncompleteGlobalEntry,
+            MalformedMutabilityInGlobalEntry
+        );
+
+        debug!("(global_entry::mutability = {:?})", mutability);
+
+        // Consume instructions
+        let instructions = self.instructions()?;
+
+        Ok(Global {
+            content_type,
+            mutability,
+            instructions,
+        })
+    }
+
+    /******** EXPORTS ********/
+
+    /// TODO: TEST
+    pub fn export_entry(&mut self) -> ParserResult<Export> {
+        debug!("-> export_entry! <-");
+        let cursor = self.cursor;
+        let mut name = String::new();
+
+        // Get module name length
+        let name_len = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteExportEntry,
+            MalformedNameLengthInExportEntry
+        );
+
+        debug!("(export_entry::name_len = 0x{:x})", name_len);
+
+        {
+            // TODO: Validate UTF-8
+            name = match self.eat_bytes(name_len as _) {
+                Some(value) => str::from_utf8(value).unwrap().into(),
+                None => {
+                    return Err(ParserError {
+                        kind: ErrorKind::IncompleteExportEntry,
+                        cursor,
+                    });
                 }
+            };
+
+            debug!("export_entry::name = {:?}", name);
+        }
+
+        let export_kind = get_value!(
+            self.external_kind(),
+            cursor,
+            IncompleteExportEntry,
+            MalformedExportKindInExportEntry
+        );
+
+        debug!("export_entry::export_kind = {:?}", export_kind);
+
+        let index = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteExportEntry,
+            MalformedExportIndexInExportEntry
+        );
+
+        debug!("export_entry::index = {:?}", index);
+
+        let desc = match export_kind {
+            // Function export
+            0x00 => ExportDesc::Function(index),
+            // Table export
+            0x01 => ExportDesc::Table(index),
+            // Memory export
+            0x02 => ExportDesc::Memory(index),
+            // Global export
+            0x03 => ExportDesc::Global(index),
+            _ => {
+                return Err(ParserError {
+                    kind: ErrorKind::InvalidExportTypeInExportEntry,
+                    cursor,
+                });
             }
         };
 
-        //
-        let mut maximum = None;
+        Ok(Export { name, desc })
+    }
 
-        //
-        if flags {
-            // TODO: LLVM module construction
-            maximum = match self.varuint32() {
+    /******** ELEMENT ********/
+
+    /// TODO: TEST
+    pub fn element_entry(&mut self) -> ParserResult<Element> {
+        debug!("-> element_entry! <-");
+        let cursor = self.cursor;
+        let mut func_indices = vec![];
+
+        // Get table index.
+        let table_index = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteElementEntry,
+            MalformedTableIndexInElementEntry
+        );
+
+        debug!("(element_entry::table_index = 0x{:x})", table_index);
+
+        // Consume code.
+        let instructions = self.instructions()?;
+
+        // Get count of function indices.
+        let func_count = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteElementEntry,
+            MalformedFunctionCountInElementEntry
+        );
+
+        debug!("(element_entry::func_count = 0x{:x})", func_count);
+
+        // Consume function indices
+        for _ in 0..func_count {
+            let func_index = get_value!(
+                self.varuint32(),
+                cursor,
+                IncompleteElementEntry,
+                MalformedFunctionIndexInElementEntry
+            );
+
+            func_indices.push(func_index);
+        }
+
+        Ok(Element { table_index, instructions, func_indices })
+    }
+
+    /******** CODE ********/
+
+    /// TODO: TEST
+    /// Each function body corresponds to the functions declared in the function section.
+    pub fn function_body(&mut self) -> ParserResult<Function> {
+        debug!("-> function_body! <-");
+        let cursor = self.cursor;
+        let mut locals = vec![];
+
+        // The length of the code section in bytes.
+        let body_size = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteFunctionBody,
+            MalformedBodySizeInFunctionBody
+        );
+
+        debug!("(function_body::body_size = 0x{:x})", body_size);
+
+        // Start position of body bytes.
+        let start_pos = self.cursor;
+
+        // Get count of locals.
+        let local_count = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteFunctionBody,
+            MalformedBodySizeInFunctionBody
+        );
+
+        debug!("(function_body::local_count = 0x{:x})", local_count);
+
+        // Consume locals.
+        for _ in 0..local_count {
+            locals.push(self.local_entry()?);
+        }
+
+        // Consume code.
+        let instructions = self.instructions()?;
+
+        // Get the amount of bytes consumed for locals and code.
+        let diff = self.cursor - start_pos;
+
+        // Check if the diff matches the body size
+        if (body_size as usize) != diff {
+            return Err(ParserError {
+                kind: ErrorKind::BodySizeDoesNotMatchContentOfFunctionBody,
+                cursor,
+            });
+        }
+
+        Ok(Function {
+            locals,
+            instructions,
+        })
+    }
+
+    /// TODO: TEST
+    pub fn local_entry(&mut self) -> ParserResult<Local> {
+        debug!("-> local_entry! <-");
+        let cursor = self.cursor;
+
+        // Get count of locals with similar types.
+        let count = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteLocalEntry,
+            MalformedCountInLocalEntry
+        );
+
+        debug!("(local_entry::count = 0x{:x})", count);
+
+        // Get type of the locals.
+        let local_type = Type::from(get_value!(
+            self.value_type(),
+            cursor,
+            IncompleteLocalEntry,
+            MalformedLocalTypeInLocalEntry
+        ));
+
+        debug!("(local_entry::local_type = {:?})", local_type);
+
+        Ok(Local { count, local_type })
+    }
+
+    /// TODO: TEST
+    pub fn instructions(&mut self) -> ParserResult<Vec<Operator>> {
+        debug!("-> instructions! <-");
+        let cursor = self.cursor;
+        let mut operators = vec![];
+
+        loop {
+            let opcode = get_value!(
+                self.uint8(),
+                cursor,
+                IncompleteExpression,
+                MalformedOpcodeInExpression
+            );
+
+            debug!("(instructions::opcode = 0x{:x})", opcode);
+
+            // If opcode is an end byte. Break!
+            if opcode == 0x0b {
+                break;
+            }
+
+            operators.push(self.operator(opcode)?);
+        }
+
+        Ok(operators)
+    }
+
+    /// TODO: TEST
+    pub fn operator(&mut self, opcode: u8) -> ParserResult<Operator> {
+        // Dispatch to the right
+        let operation = match opcode {
+            // CONTROL FLOW
+            0x0b => Operator::End,
+            0x00 => Operator::Unreachable,
+            0x01 => Operator::Nop,
+            0x02 => unimplemented!(),
+            0x03 => unimplemented!(),
+            0x04 => unimplemented!(),
+            0x05 => unimplemented!(),
+            0x0c => unimplemented!(),
+            0x0d => unimplemented!(),
+            0x0e => unimplemented!(),
+            0x0f => unimplemented!(),
+            // CALL
+            0x10 => unimplemented!(),
+            0x11 => unimplemented!(),
+            // PARAMETRIC
+            0x1A => unimplemented!(),
+            0x1B => unimplemented!(),
+            // VARIABLE ACCESS
+            0x20 => unimplemented!(),
+            0x21 => unimplemented!(),
+            0x22 => unimplemented!(),
+            0x23 => unimplemented!(),
+            0x24 => unimplemented!(),
+            // MEMORY
+            0x28 => unimplemented!(),
+            0x29 => unimplemented!(),
+            0x2a => unimplemented!(),
+            0x2b => unimplemented!(),
+            0x2c => unimplemented!(),
+            0x2d => unimplemented!(),
+            0x2e => unimplemented!(),
+            0x2f => unimplemented!(),
+            0x30 => unimplemented!(),
+            0x31 => unimplemented!(),
+            0x32 => unimplemented!(),
+            0x33 => unimplemented!(),
+            0x34 => unimplemented!(),
+            0x35 => unimplemented!(),
+            0x36 => unimplemented!(),
+            0x37 => unimplemented!(),
+            0x38 => unimplemented!(),
+            0x39 => unimplemented!(),
+            0x3a => unimplemented!(),
+            0x3b => unimplemented!(),
+            0x3c => unimplemented!(),
+            0x3d => unimplemented!(),
+            0x3e => unimplemented!(),
+            0x3f => unimplemented!(),
+            0x40 => unimplemented!(),
+            // CONSTANTS
+            0x41 => unimplemented!(),
+            0x42 => unimplemented!(),
+            0x43 => unimplemented!(),
+            0x44 => unimplemented!(),
+            // COMPARISONS
+            0x45 => unimplemented!(),
+            0x46 => unimplemented!(),
+            0x47 => unimplemented!(),
+            0x48 => unimplemented!(),
+            0x49 => unimplemented!(),
+            0x4a => unimplemented!(),
+            0x4b => unimplemented!(),
+            0x4c => unimplemented!(),
+            0x4d => unimplemented!(),
+            0x4e => unimplemented!(),
+            0x4f => unimplemented!(),
+            0x50 => unimplemented!(),
+            0x51 => unimplemented!(),
+            0x52 => unimplemented!(),
+            0x53 => unimplemented!(),
+            0x54 => unimplemented!(),
+            0x55 => unimplemented!(),
+            0x56 => unimplemented!(),
+            0x57 => unimplemented!(),
+            0x58 => unimplemented!(),
+            0x59 => unimplemented!(),
+            0x5a => unimplemented!(),
+            0x5b => unimplemented!(),
+            0x5c => unimplemented!(),
+            0x5d => unimplemented!(),
+            0x5e => unimplemented!(),
+            0x5f => unimplemented!(),
+            0x60 => unimplemented!(),
+            0x61 => unimplemented!(),
+            0x62 => unimplemented!(),
+            0x63 => unimplemented!(),
+            0x64 => unimplemented!(),
+            0x65 => unimplemented!(),
+            0x66 => unimplemented!(),
+            // NUMERIC
+            0x67 => unimplemented!(),
+            0x68 => unimplemented!(),
+            0x69 => unimplemented!(),
+            0x6a => unimplemented!(),
+            0x6b => unimplemented!(),
+            0x6c => unimplemented!(),
+            0x6d => unimplemented!(),
+            0x6e => unimplemented!(),
+            0x6f => unimplemented!(),
+            0x70 => unimplemented!(),
+            0x71 => unimplemented!(),
+            0x72 => unimplemented!(),
+            0x73 => unimplemented!(),
+            0x74 => unimplemented!(),
+            0x75 => unimplemented!(),
+            0x76 => unimplemented!(),
+            0x77 => unimplemented!(),
+            0x78 => unimplemented!(),
+            0x79 => unimplemented!(),
+            0x7a => unimplemented!(),
+            0x7b => unimplemented!(),
+            0x7c => unimplemented!(),
+            0x7d => unimplemented!(),
+            0x7e => unimplemented!(),
+            0x7f => unimplemented!(),
+            0x80 => unimplemented!(),
+            0x81 => unimplemented!(),
+            0x82 => unimplemented!(),
+            0x83 => unimplemented!(),
+            0x84 => unimplemented!(),
+            0x85 => unimplemented!(),
+            0x86 => unimplemented!(),
+            0x87 => unimplemented!(),
+            0x88 => unimplemented!(),
+            0x89 => unimplemented!(),
+            0x8a => unimplemented!(),
+            0x8b => unimplemented!(),
+            0x8c => unimplemented!(),
+            0x8d => unimplemented!(),
+            0x8e => unimplemented!(),
+            0x8f => unimplemented!(),
+            0x90 => unimplemented!(),
+            0x91 => unimplemented!(),
+            0x92 => unimplemented!(),
+            0x93 => unimplemented!(),
+            0x94 => unimplemented!(),
+            0x95 => unimplemented!(),
+            0x96 => unimplemented!(),
+            0x97 => unimplemented!(),
+            0x98 => unimplemented!(),
+            0x99 => unimplemented!(),
+            0x9a => unimplemented!(),
+            0x9b => unimplemented!(),
+            0x9c => unimplemented!(),
+            0x9d => unimplemented!(),
+            0x9e => unimplemented!(),
+            0x9f => unimplemented!(),
+            0xa0 => unimplemented!(),
+            0xa1 => unimplemented!(),
+            0xa2 => unimplemented!(),
+            0xa3 => unimplemented!(),
+            0xa4 => unimplemented!(),
+            0xa5 => unimplemented!(),
+            0xa6 => unimplemented!(),
+            // CONVERSIONS
+            0xa7 => unimplemented!(),
+            0xa8 => unimplemented!(),
+            0xa9 => unimplemented!(),
+            0xaa => unimplemented!(),
+            0xab => unimplemented!(),
+            0xac => unimplemented!(),
+            0xad => unimplemented!(),
+            0xae => unimplemented!(),
+            0xaf => unimplemented!(),
+            0xb0 => unimplemented!(),
+            0xb1 => unimplemented!(),
+            0xb2 => unimplemented!(),
+            0xb3 => unimplemented!(),
+            0xb4 => unimplemented!(),
+            0xb5 => unimplemented!(),
+            0xb6 => unimplemented!(),
+            0xb7 => unimplemented!(),
+            0xb8 => unimplemented!(),
+            0xb9 => unimplemented!(),
+            0xba => unimplemented!(),
+            0xbb => unimplemented!(),
+            // REINTERPRETATIONS
+            0xbc => unimplemented!(),
+            0xbd => unimplemented!(),
+            0xbe => unimplemented!(),
+            0xbf => unimplemented!(),
+            _ => unimplemented!(),
+        };
+
+        Ok(operation)
+    }
+
+    /******** DATA ********/
+
+    /// TODO: TEST
+    pub fn data_entry(&mut self) -> ParserResult<Data> {
+        debug!("-> data_entry! <-");
+        let cursor = self.cursor;
+
+        // Get memory index.
+        let memory_index = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteDataEntry,
+            MalformedTableIndexInDataEntry
+        );
+
+        debug!("(data_entry::memory_index = 0x{:x})", memory_index);
+
+        // Consume code.
+        let instructions = self.instructions()?;
+
+        // Get count of following bytes.
+        let byte_count = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteDataEntry,
+            MalformedByteCountInDataEntry
+        );
+
+        debug!("(data_entry::func_count = 0x{:x})", byte_count);
+
+        // Consume bytes.
+        let bytes = match self.eat_bytes(byte_count as _) {
+            Some(value) => value.to_vec(),
+            None => return Err(ParserError { kind: ErrorKind::IncompleteDataEntry, cursor }),
+        };
+
+        Ok(Data { memory_index, instructions, bytes })
+    }
+
+    /******** TYPES ********/
+
+    /// TODO: TEST
+    pub fn limits(&mut self) -> Result<(u32, Option<u32>), ParserError> {
+        // debug!("-> limits! <-");
+        let cursor = self.cursor;
+        let flags = get_value!(
+            self.varuint1(),
+            cursor,
+            IncompleteLimits,
+            MalformedFlagsInLimits
+        );
+
+        let minimum = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteLimits,
+            MalformedMinimumInLimits
+        );
+
+        // Get maximum if specified.
+        let maximum = if flags {
+            match self.varuint32() {
                 Ok(value) => Some(value),
                 Err(error) => {
-                    //
-                    if error == ParserError::BufferEndReached {
-                        return Err((ParserError::IncompleteResizableLimits, start_position));
+                    if error == ErrorKind::BufferEndReached {
+                        return Err(ParserError {
+                            kind: ErrorKind::IncompleteLimits,
+                            cursor,
+                        });
                     } else {
-                        return Err((ParserError::MalformedMaximumInResizableLimits, start_position));
+                        return Err(ParserError {
+                            kind: ErrorKind::MalformedMaximumInLimits,
+                            cursor,
+                        });
                     }
                 }
-            };
-        }
+            }
+        } else {
+            None
+        };
 
-        Ok((initial, maximum))
+        Ok((minimum, maximum))
     }
 
     /// TODO: TEST
-    pub fn func_type(&mut self) -> Result<(), (ParserError, usize)> {
-        println!("\n=== func_type! ===");
-        let start_position = self.cursor;
+    /// TODO: Supports a single return type for now.
+    pub fn func_type(&mut self) -> ParserResult<Type> {
+        // debug!("-> func_type! <-");
+        let cursor = self.cursor;
+        let mut params = vec![];
+        let mut returns = vec![];
 
-        //
-        let param_count = match self.varint32() {
-            Ok(value) => value,
-            Err(error) => {
-                //
-                if error == ParserError::BufferEndReached {
-                    return Err((ParserError::IncompleteFunctionType, start_position));
-                } else {
-                    return Err((ParserError::MalformedParamCountInFunctionType, start_position));
-                }
-            }
-        };
+        // Get param count.
+        let param_count = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteFunctionType,
+            MalformedParamCountInFunctionType
+        );
 
-        println!("\n::func_type::param_count = 0x{:x}", param_count);
+        debug!("(func_type::param_count = 0x{:x})", param_count);
 
-        //
-        for i in 0..param_count {
-            /// TODO: LLVM module construction
-            let param_type = match self.value_type() {
-                Ok(value) => value,
-                Err(error) => {
-                    if error == ParserError::BufferEndReached {
-                        return Err((ParserError::IncompleteFunctionType, start_position));
-                    } else {
-                        return Err((ParserError::MalformedParamTypeInFunctionType, start_position));
-                    }
-                }
-            };
+        // Get param types.
+        for _ in 0..param_count {
+            let param_type = Type::from(get_value!(
+                self.value_type(),
+                cursor,
+                IncompleteFunctionType,
+                MalformedParamTypeInFunctionType
+            ));
 
-            println!("\n::func_type::param_type = {:?}", param_type);
+            params.push(param_type);
         }
+        debug!("(func_type::param_types = {:?})", params);
 
-        //
-        let return_count = match self.varuint1() {
-            Ok(value) => value,
-            Err(error) => {
-                //
-                if error == ParserError::BufferEndReached {
-                    return Err((ParserError::IncompleteFunctionType, start_position));
-                } else {
-                    return Err((ParserError::MalformedReturnCountInFunctionType, start_position));
-                }
-            }
-        };
+        // Get return count.
+        let return_count = get_value!(
+            self.varuint32(),
+            cursor,
+            IncompleteFunctionType,
+            MalformedReturnCountInFunctionType
+        );
 
-        println!("\n::func_type::return_count = {:?}", return_count);
+        debug!("(func_type::return_count = {:?})", return_count);
 
-        if return_count {
-            /// TODO: LLVM module construction
-            let return_type = match self.value_type() {
-                Ok(value) => value,
-                Err(error) => {
-                    if error == ParserError::BufferEndReached {
-                        return Err((ParserError::IncompleteFunctionType, start_position));
-                    } else {
-                        return Err((ParserError::MalformedReturnTypeInFunctionType, start_position));
-                    }
-                }
-            };
+        // Get return types.
+        for _ in 0..return_count {
+            let return_type = Type::from(get_value!(
+                self.value_type(),
+                cursor,
+                IncompleteFunctionType,
+                MalformedParamTypeInFunctionType
+            ));
 
-            println!("\n::func_type::return_type = {:?}", return_type);
+            returns.push(return_type);
         }
+        debug!("(func_type::return_types = {:?})", returns);
 
-        Ok(())
+        Ok(Type::Func { params, returns })
     }
 
-    #[inline]
     /// TODO: TEST
-    pub fn value_type(&mut self) -> Result<i8, ParserError> {
-        println!("\n=== value_type! ===");
-
+    pub fn value_type(&mut self) -> Result<i8, ErrorKind> {
+        // debug!("-> value_type! <-");
         let value = self.varint7()?;
 
         // i32, i64, f32, f64
         if value == -0x01 || value == -0x02 || value == -0x03 || value == -0x04 {
             Ok(value as _)
         } else {
-            Err(ParserError::InvalidValueType)
+            Err(ErrorKind::InvalidValueType)
         }
     }
 
-    #[inline]
     /// TODO: TEST
-    pub fn external_kind(&mut self) -> Result<u8, ParserError> {
-        println!("\n=== external_kind! ===");
+    pub fn external_kind(&mut self) -> Result<u8, ErrorKind> {
+        debug!("-> external_kind! <-");
 
         let value = self.uint8()?;
 
@@ -710,11 +1610,50 @@ impl <'a> Parser<'a> {
         if value == 0x00 || value == 0x01 || value == 0x02 || value == 0x03 {
             Ok(value as _)
         } else {
-            Err(ParserError::InvalidImportType)
+            Err(ErrorKind::InvalidImportType)
         }
     }
 
-    #[inline]
+    /******** UTILS ********/
+
+    /// TODO: TEST
+    pub fn skip_to_section(&mut self, section_id: u8) -> ParserResult<()> {
+        loop {
+            if section_id == self.section_id()? {
+                break;
+            }
+            let payload_len = self.peek_varuint32()?;
+            if !self.skip(payload_len as _) {
+                return Err(ParserError {
+                    kind: ErrorKind::BufferEndReached,
+                    cursor: self.cursor,
+                });
+            };
+        }
+        Ok(())
+    }
+
+    /// TODO: TEST
+    pub fn peek_varuint32(&mut self) -> ParserResult<u32> {
+        let cursor = self.cursor;
+        let value = self.varuint32();
+        self.cursor = cursor;
+        match value {
+            Ok(value) => Ok(value),
+            Err(kind) => Err(ParserError { kind, cursor }),
+        }
+    }
+
+    /// TODO: TEST
+    pub fn skip(&mut self, len: usize) -> bool {
+        let jump = self.cursor + len + 1;
+        // Check if jump is within code buffer bounds
+        if jump > self.code.len() {
+            return false;
+        }
+        true
+    }
+
     /// Gets a byte from the code buffer and (if available)
     /// advances the cursor.
     pub fn eat_byte(&mut self) -> Option<u8> {
@@ -743,15 +1682,15 @@ impl <'a> Parser<'a> {
     }
 
     /// Consumes 1 byte that represents an 8-bit unsigned integer
-    pub fn uint8(&mut self) -> Result<u8, ParserError> {
+    pub fn uint8(&mut self) -> Result<u8, ErrorKind> {
         if let Some(byte) = self.eat_byte() {
             return Ok(byte);
         }
-        Err(ParserError::BufferEndReached)
+        Err(ErrorKind::BufferEndReached)
     }
 
     /// Consumes 2 bytes that represent a 16-bit unsigned integer
-    pub fn uint16(&mut self) -> Result<u16, ParserError> {
+    pub fn uint16(&mut self) -> Result<u16, ErrorKind> {
         if let Some(bytes) = self.eat_bytes(2) {
             let mut shift = 0;
             let mut result = 0;
@@ -761,11 +1700,11 @@ impl <'a> Parser<'a> {
             }
             return Ok(result);
         }
-        Err(ParserError::BufferEndReached)
+        Err(ErrorKind::BufferEndReached)
     }
 
     /// Consumes 4 bytes that represent a 32-bit unsigned integer
-    pub fn uint32(&mut self) -> Result<u32, ParserError> {
+    pub fn uint32(&mut self) -> Result<u32, ErrorKind> {
         if let Some(bytes) = self.eat_bytes(4) {
             let mut shift = 0;
             let mut result = 0;
@@ -775,51 +1714,51 @@ impl <'a> Parser<'a> {
             }
             return Ok(result);
         }
-        Err(ParserError::BufferEndReached)
+        Err(ErrorKind::BufferEndReached)
     }
 
     /// Consumes a byte that represents a 1-bit LEB128 unsigned integer encoding
-    pub fn varuint1(&mut self) -> Result<bool, ParserError> {
+    pub fn varuint1(&mut self) -> Result<bool, ErrorKind> {
         if let Some(byte) = self.eat_byte() {
             return match byte {
                 1 => Ok(true),
                 0 => Ok(false),
-                _ => Err(ParserError::MalformedVaruint1),
+                _ => Err(ErrorKind::MalformedVaruint1),
             };
         }
         // We expect the if statement to return an Ok result. If it doesn't
-        // then we are trying to read more than 1 byte, which is Malformed for a varuint1
-        Err(ParserError::BufferEndReached)
+        // then we are trying to read more than 1 byte, which is malformed for a varuint1
+        Err(ErrorKind::BufferEndReached)
     }
 
     /// Consumes a byte that represents a 7-bit LEB128 unsigned integer encoding
-    pub fn varuint7(&mut self) -> Result<u8, ParserError> {
+    pub fn varuint7(&mut self) -> Result<u8, ErrorKind> {
         if let Some(byte) = self.eat_byte() {
-            let mut result = byte;
+            let result = byte;
             // Check if msb is unset.
             if result & 0b1000_0000 != 0 {
-                return Err(ParserError::MalformedVaruint7);
+                return Err(ErrorKind::MalformedVaruint7);
             }
             return Ok(result);
         }
         // We expect the if statement to return an Ok result. If it doesn't
-        // then we are trying to read more than 1 byte, which is Malformed for a varuint7
-        Err(ParserError::BufferEndReached)
+        // then we are trying to read more than 1 byte, which is malformed for a varuint7
+        Err(ErrorKind::BufferEndReached)
     }
 
     /// Consumes 1-5 bytes that represent a 32-bit LEB128 unsigned integer encoding
-    pub fn varuint32(&mut self) -> Result<u32, ParserError> {
-        // println!("= varuint32! ===");
+    pub fn varuint32(&mut self) -> Result<u32, ErrorKind> {
+        // debug!("-> varuint32! <-");
         let mut result = 0;
         let mut shift = 0;
         while shift < 35 {
             let byte = match self.eat_byte() {
                 Some(value) => value,
-                None => return Err(ParserError::BufferEndReached),
+                None => return Err(ErrorKind::BufferEndReached),
             };
-            // println!("count = {}, byte = 0b{:08b}", count, byte);
+            // debug!("(count = {}, byte = 0b{:08b})", count, byte);
             // Unset the msb and shift by multiples of 7 to the left
-            let value = ((byte & !0b10000000) as u32) << shift;
+            let value = ((byte & !0b1000_0000) as u32) << shift;
             result |= value;
             // Return if any of the bytes has an unset msb
             if byte & 0b1000_0000 == 0 {
@@ -828,43 +1767,43 @@ impl <'a> Parser<'a> {
             shift += 7;
         }
         // We expect the loop to terminate early and return an Ok result. If it doesn't
-        // then we are trying to read more than 5 bytes, which is Malformed for a varuint32
-        Err(ParserError::MalformedVaruint32)
+        // then we are trying to read more than 5 bytes, which is malformed for a varuint32
+        Err(ErrorKind::MalformedVaruint32)
     }
 
     /// Consumes a byte that represents a 7-bit LEB128 signed integer encoding
-    pub fn varint7(&mut self) -> Result<i8, ParserError> {
+    pub fn varint7(&mut self) -> Result<i8, ErrorKind> {
         if let Some(byte) = self.eat_byte() {
             let mut result = byte;
             // Check if msb is unset.
             if result & 0b1000_0000 != 0 {
-                return Err(ParserError::MalformedVarint7);
+                return Err(ErrorKind::MalformedVarint7);
             }
             // If the 7-bit value is signed, extend the sign.
-		    if result & 0b0100_0000 == 0b0100_0000 {
+            if result & 0b0100_0000 == 0b0100_0000 {
                 result |= 0b1000_0000;
             }
             return Ok(result as i8);
         }
-        // We expect the if statement to return an Ok result. If it doesn't
-        // then we are trying to read more than 1 byte, which is Malformed for a varint7
-        Err(ParserError::BufferEndReached)
+
+        Err(ErrorKind::BufferEndReached)
     }
 
     /// Consumes 1-5 bytes that represent a 32-bit LEB128 signed integer encoding
-    pub fn varint32(&mut self) -> Result<i32, ParserError> {
-        // println!("= varint32! ===");
+    pub fn varint32(&mut self) -> Result<i32, ErrorKind> {
+        // debug!("-> varint32! <-");
         let mut result = 0;
         let mut shift = 0;
         // Can consume at most 5 bytes
-        while shift < 35 { // (shift = 0, 7, 14 .. 35)
+        while shift < 35 {
+            // (shift = 0, 7, 14 .. 35)
             let byte = match self.eat_byte() {
                 Some(value) => value,
-                None => return Err(ParserError::BufferEndReached),
+                None => return Err(ErrorKind::BufferEndReached),
             };
-            // println!("count = {}, byte = 0b{:08b}", count, byte);
+            // debug!("(count = {}, byte = 0b{:08b})", count, byte);
             // Unset the msb and shift by multiples of 7 to the left
-            let value = ((byte & !0b10000000) as i32) << shift;
+            let value = ((byte & !0b1000_0000) as i32) << shift;
             result |= value;
             // Return if any of the bytes has an unset msb
             if byte & 0b1000_0000 == 0 {
@@ -879,25 +1818,26 @@ impl <'a> Parser<'a> {
             shift += 7;
         }
         // We expect the loop to terminate early and return an Ok result. If it doesn't
-        // then we are trying to read more than 5 bytes, which is Malformed for a varint32
-        Err(ParserError::MalformedVarint32)
+        // then we are trying to read more than 5 bytes, which is malformed for a varint32
+        Err(ErrorKind::MalformedVarint32)
     }
 
     /// TODO: TEST
     /// Consumes 1-9 bytes that represent a 64-bit LEB128 signed integer encoding
-    pub fn varint64(&mut self) -> Result<i64, ParserError> {
-        // println!("= varint64! ===");
+    pub fn varint64(&mut self) -> Result<i64, ErrorKind> {
+        // debug!("-> varint64! <-");
         let mut result = 0;
         let mut shift = 0;
         // Can consume at most 9 bytes
-        while shift < 63 { // (shift = 0, 7, 14 .. 56)
+        while shift < 63 {
+            // (shift = 0, 7, 14 .. 56)
             let byte = match self.eat_byte() {
                 Some(value) => value,
-                None => return Err(ParserError::BufferEndReached),
+                None => return Err(ErrorKind::BufferEndReached),
             };
-            // println!("count = {}, byte = 0b{:08b}", count, byte);
+            // debug!("(count = {}, byte = 0b{:08b})", count, byte);
             // Unset the msb and shift by multiples of 7 to the left
-            let value = ((byte & !0b10000000) as i64) << shift;
+            let value = ((byte & !0b1000_0000) as i64) << shift;
             result |= value;
             // Return if any of the bytes has an unset msb
             if byte & 0b1000_0000 == 0 {
@@ -912,10 +1852,7 @@ impl <'a> Parser<'a> {
             shift += 7;
         }
         // We expect the loop to terminate early and return an Ok result. If it doesn't
-        // then we are trying to read more than 5 bytes, which is Malformed for a varint32
-        Err(ParserError::MalformedVarint64)
+        // then we are trying to read more than 5 bytes, which is malformed for a varint64
+        Err(ErrorKind::MalformedVarint64)
     }
 }
-
-// pub fn compile(source: Vec<u8>) -> Module {
-// }

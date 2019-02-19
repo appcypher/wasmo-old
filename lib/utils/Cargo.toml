@@ -1,22 +1,17 @@
 [package]
-name = "wasmlite"
+name = "wasmlite-utils"
 version = "0.0.1"
 authors = ["Steve Akinyemi <appcypher@outlook.com>"]
+license = "Apache-2.0"
 edition = "2018"
 #-----------------------------------------
-description = "An embeddable WebAssembly virtual machine"
-readme = "README.md"
+description = "This crate contains utilities for wasmlite project"
+readme = "../../README.md"
 repository = "https://github.com/appcypher/wasmlite"
-keywords = ["compiler", "webassmebly", "vm", "runtime", "llvm"]
+keywords = ["compiler", "webassembly", "wasm", "utils"]
 categories = ["development-tools", "parser-implementations", "wasm"]
 documentation = "https://github.com/appcypher/wasmlite"
 homepage = "https://github.com/appcypher/wasmlite"
-license = "Apache-2.0"
-
-[dependencies]
-wasmlite-parser = { path = "lib/parser" }
-wasmlite-llvm = { path = "lib/llvm" }
-wasmlite-utils = { path = "lib/utils" }
 
 [features]
 debug = []

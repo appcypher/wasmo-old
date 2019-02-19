@@ -1,0 +1,6 @@
+[package]
+name = "wasmlite-tests"
+version = "0.0.1"
+authors = ["Steve Akinyemi <appcypher@outlook.com>"]
+license = "Apache-2.0"
+edition = "2018"
