@@ -137,3 +137,8 @@ let expression = module.add_expression(wasm_expression_binary, instance);
     - https://webassembly.github.io/spec/core/binary/values.html#names
 
 - error messages and making error position point of error instead of start_position
+
+### ATTRIBUTIONS
+- [inkwell] - inspired the LLVM codegen section
+- [wasmer] - takes some design cues from this similar project
+- [wasmtime] - takes some design cues from this similar project as well
