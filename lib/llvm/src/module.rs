@@ -2,7 +2,9 @@ use std::rc::Rc;
 
 use std::ffi::CString;
 
-use llvm_sys::core::{LLVMModuleCreateWithNameInContext, LLVMModuleCreateWithName, LLVMDisposeModule};
+use llvm_sys::core::{
+    LLVMDisposeModule, LLVMModuleCreateWithName, LLVMModuleCreateWithNameInContext,
+};
 
 use llvm_sys::prelude::{LLVMContextRef, LLVMModuleRef};
 
@@ -31,9 +33,7 @@ impl Module {
     pub fn create(name: &str) -> Module {
         let name = CString::new(name).expect("Conversion to CString failed");
 
-        let module = unsafe {
-            LLVMModuleCreateWithName(name.as_ptr())
-        };
+        let module = unsafe { LLVMModuleCreateWithName(name.as_ptr()) };
 
         Module::new(module, None)
     }
@@ -42,7 +42,10 @@ impl Module {
 ///
 impl Drop for Module {
     fn drop(&mut self) {
-        debug!("Module drop attempt @ ref count = {:?}", Rc::strong_count(&self.module));
+        debug!(
+            "Module drop attempt @ ref count = {:?}",
+            Rc::strong_count(&self.module)
+        );
         if Rc::strong_count(&self.module) == 1 {
             unsafe {
                 LLVMDisposeModule(*self.module);

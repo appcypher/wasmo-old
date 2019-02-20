@@ -1,10 +1,10 @@
+mod wasm;
+use wasm::samples;
 use wasmlite_parser::parser::Parser;
 
-use wasmlite::wasm_codes::{
-    function_with_locals_only,
-    function_with_nop,
-};
-
 fn main() {
-    Parser::new(&function_with_nop()).module().unwrap();
+    // Parser::new(&samples::valid_module_with_nop_in_function_body()).module().unwrap();
+    // Parser::new(&samples::valid_module_with_table_section_and_maximum()).module().unwrap();
+    // Parser::new(&samples::valid_module_with_table_section_no_maximum()).module().unwrap();
+    Parser::new(&samples::valid_module_with_memory_section_and_maximum()).module().unwrap();
 }

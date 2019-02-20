@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use std::ffi::CString;
 
-use llvm_sys::core::{LLVMContextCreate, LLVMModuleCreateWithNameInContext, LLVMContextDispose};
+use llvm_sys::core::{LLVMContextCreate, LLVMContextDispose, LLVMModuleCreateWithNameInContext};
 
 use llvm_sys::prelude::{LLVMContextRef, LLVMModuleRef};
 
@@ -13,27 +13,25 @@ use crate::module::Module;
 ///
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Context {
-    pub(crate) context: Rc<LLVMContextRef>
+    pub(crate) context: Rc<LLVMContextRef>,
 }
 
 ///
 impl Context {
     pub fn create() -> Self {
-        let context = unsafe {
-            LLVMContextCreate()
-        };
+        let context = unsafe { LLVMContextCreate() };
 
         assert!(!context.is_null());
 
-        Self { context: Rc::new(context) }
+        Self {
+            context: Rc::new(context),
+        }
     }
 
     pub fn create_module(&self, name: &str) -> Module {
         let name = CString::new(name).expect("Conversion to CString failed");
 
-        let module = unsafe {
-            LLVMModuleCreateWithNameInContext(name.as_ptr(), *self.context)
-        };
+        let module = unsafe { LLVMModuleCreateWithNameInContext(name.as_ptr(), *self.context) };
 
         Module::new(module, Some(self))
     }
@@ -66,7 +64,10 @@ impl Context {
 ///
 impl Drop for Context {
     fn drop(&mut self) {
-        debug!("Context drop attempt @ ref count = {:?}", Rc::strong_count(&self.context));
+        debug!(
+            "Context drop attempt @ ref count = {:?}",
+            Rc::strong_count(&self.context)
+        );
         if Rc::strong_count(&self.context) == 1 {
             unsafe {
                 LLVMContextDispose(*self.context);
@@ -74,5 +75,3 @@ impl Drop for Context {
         }
     }
 }
-
-

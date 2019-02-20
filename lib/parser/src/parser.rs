@@ -1,13 +1,12 @@
-#[macro_use]
 use std::str;
 use crate::{
-    macros,
     errors::ParserError,
     ir::{
-        Export, ExportDesc, Function, Global, Import, ImportDesc, Local, Memory, Module, Operator,
-        Section, Table, Type, Element, Data
+        Data, Element, Export, ExportDesc, Function, Global, Import, ImportDesc, Local, Memory,
+        Operator, Section, Table, Type,
     },
     kinds::{ErrorKind, SectionKind},
+    macros,
     validation::validate_section_exists,
 };
 use wasmlite_utils::*;
@@ -52,7 +51,7 @@ impl<'a> Parser<'a> {
     /// TODO: TEST
     /// Generates an IR rpresenting a parsed wasm module.
     pub fn module(&mut self) -> ParserResult<()> {
-        debug!("-> module! <-");
+        verbose!("-> module! <-");
 
         // Consume preamble.
         self.module_preamble()?;
@@ -69,7 +68,7 @@ impl<'a> Parser<'a> {
     /// Checks if the following bytes are expected
     /// wasm preamble bytes.
     pub fn module_preamble(&mut self) -> ParserResult<()> {
-        debug!("-> module_preamble! <-");
+        verbose!("-> module_preamble! <-");
         let cursor = self.cursor;
 
         // Consume magic number.
@@ -99,7 +98,7 @@ impl<'a> Parser<'a> {
             }
         };
 
-        debug!("(module_preamble::magic_no = 0x{:08x})", magic_no);
+        verbose!("(module_preamble::magic_no = 0x{:08x})", magic_no);
 
         // Consume version number.
         let version_no = match self.uint32() {
@@ -128,14 +127,14 @@ impl<'a> Parser<'a> {
             }
         };
 
-        debug!("(module_preamble::version_no = 0x{:08x})", version_no);
+        verbose!("(module_preamble::version_no = 0x{:08x})", version_no);
 
         Ok(())
     }
 
     /// TODO: TEST
     pub fn sections(&mut self) -> ParserResult<Vec<Section>> {
-        debug!("-> module_sections! <-");
+        verbose!("-> module_sections! <-");
 
         let mut sections = vec![];
 
@@ -166,7 +165,7 @@ impl<'a> Parser<'a> {
                 self.push_section_id(&section_id);
             }
 
-            debug!(
+            verbose!(
                 "(module_sections::section code = {:?})",
                 SectionKind::from(section_id)
             );
@@ -181,7 +180,7 @@ impl<'a> Parser<'a> {
     /// Gets the next section id and payload.
     /// Needed by reader
     pub fn section_id(&mut self) -> ParserResult<u8> {
-        debug!("-> module_section_id! <-");
+        verbose!("-> module_section_id! <-");
         let cursor = self.cursor;
 
         // Get section id.
@@ -200,7 +199,7 @@ impl<'a> Parser<'a> {
 
     /// Gets the next module section
     pub fn section(&mut self, section_id: u8) -> ParserResult<Section> {
-        debug!("-> section! <-");
+        verbose!("-> section! <-");
         let cursor = self.cursor;
 
         Ok(match section_id {
@@ -230,7 +229,7 @@ impl<'a> Parser<'a> {
     /// TODO: TEST
     /// TODO: Name section and linking section.
     pub fn custom_section(&mut self) -> ParserResult<Section> {
-        debug!("-> custom_section! <-");
+        verbose!("-> custom_section! <-");
         let cursor = self.cursor;
 
         // The length of the code section in bytes.
@@ -279,7 +278,7 @@ impl<'a> Parser<'a> {
 
     /// TODO: TEST
     pub fn type_section(&mut self) -> ParserResult<Section> {
-        debug!("-> type_section! <-");
+        verbose!("-> type_section! <-");
         let cursor = self.cursor;
         let mut func_types = vec![];
 
@@ -291,7 +290,7 @@ impl<'a> Parser<'a> {
             MalformedPayloadLengthInTypeSection
         );
 
-        debug!("(type_section::payload_len = 0x{:x})", payload_len);
+        verbose!("(type_section::payload_len = 0x{:x})", payload_len);
 
         // Get the count of type entries.
         let entry_count = get_value!(
@@ -301,7 +300,7 @@ impl<'a> Parser<'a> {
             MalformedEntryCountInTypeSection
         );
 
-        debug!("(type_section::entry_count = 0x{:x})", entry_count);
+        verbose!("(type_section::entry_count = 0x{:x})", entry_count);
 
         // Consume the type entries.
         for _ in 0..entry_count {
@@ -312,7 +311,7 @@ impl<'a> Parser<'a> {
                 MalformedTypeInTypeSection
             );
 
-            debug!("(type_section::type_id = {:?})", type_id);
+            verbose!("(type_section::type_id = {:?})", type_id);
 
             // Type must be a func type.
             let func_type = match type_id {
@@ -334,7 +333,7 @@ impl<'a> Parser<'a> {
 
     /// TODO: TEST
     pub fn import_section(&mut self) -> ParserResult<Section> {
-        debug!("-> import_section! <-");
+        verbose!("-> import_section! <-");
         let cursor = self.cursor;
         let mut imports = vec![];
 
@@ -346,7 +345,7 @@ impl<'a> Parser<'a> {
             MalformedPayloadLengthInImportSection
         );
 
-        debug!("(import_section::payload_len = 0x{:x})", payload_len);
+        verbose!("(import_section::payload_len = 0x{:x})", payload_len);
 
         // Get the count of import entries.
         let entry_count = get_value!(
@@ -356,13 +355,13 @@ impl<'a> Parser<'a> {
             MalformedEntryCountInImportSection
         );
 
-        debug!("(import_section::entry_count = 0x{:x})", entry_count);
+        verbose!("(import_section::entry_count = 0x{:x})", entry_count);
 
         // Consume the import entries.
         for _ in 0..entry_count {
             imports.push(self.import_entry()?);
         }
-        debug!("(import_section::import_entries = {:?})", imports);
+        verbose!("(import_section::import_entries = {:?})", imports);
 
         // TODO
         Ok(Section::Import(imports))
@@ -370,7 +369,7 @@ impl<'a> Parser<'a> {
 
     /// TODO: TEST
     pub fn function_section(&mut self) -> ParserResult<Section> {
-        debug!("-> function_section! <-");
+        verbose!("-> function_section! <-");
         let cursor = self.cursor;
         let mut type_indices = vec![];
 
@@ -382,7 +381,7 @@ impl<'a> Parser<'a> {
             MalformedPayloadLengthInFunctionSection
         );
 
-        debug!("(function_section::payload_len = 0x{:x})", payload_len);
+        verbose!("(function_section::payload_len = 0x{:x})", payload_len);
 
         // Get the count of function entries,
         let function_count = get_value!(
@@ -392,7 +391,7 @@ impl<'a> Parser<'a> {
             MalformedEntryCountInFunctionSection
         );
 
-        debug!(
+        verbose!(
             "(function_section::function_count = 0x{:x})",
             function_count
         );
@@ -408,7 +407,7 @@ impl<'a> Parser<'a> {
 
             type_indices.push(type_index);
         }
-        debug!("(function_section::type_indices = {:?})", type_indices);
+        verbose!("(function_section::type_indices = {:?})", type_indices);
 
         // TODO
         Ok(Section::Function(type_indices))
@@ -416,7 +415,7 @@ impl<'a> Parser<'a> {
 
     /// TODO: TEST
     pub fn table_section(&mut self) -> ParserResult<Section> {
-        debug!("-> table_section! <-");
+        verbose!("-> table_section! <-");
         let cursor = self.cursor;
         let mut tables = vec![];
 
@@ -428,7 +427,7 @@ impl<'a> Parser<'a> {
             MalformedPayloadLengthInTableSection
         );
 
-        debug!("(table_section::payload_len = 0x{:x})", payload_len);
+        verbose!("(table_section::payload_len = 0x{:x})", payload_len);
 
         // Get the count of table entries,
         let table_count = get_value!(
@@ -438,17 +437,14 @@ impl<'a> Parser<'a> {
             MalformedEntryCountInTableSection
         );
 
-        debug!("(table_section::table_count = 0x{:x})", table_count);
+        verbose!("(table_section::table_count = 0x{:x})", table_count);
 
         // Consume the function entries.
         for _ in 0..table_count {
             tables.push(self.table_entry()?);
         }
 
-        debug!(
-                "(table_section::table_entries = {:?})",
-                tables
-            );
+        verbose!("(table_section::table_entries = {:?})", tables);
 
         // TODO
         Ok(Section::Table(tables))
@@ -456,7 +452,7 @@ impl<'a> Parser<'a> {
 
     /// TODO: TEST
     pub fn memory_section(&mut self) -> ParserResult<Section> {
-        debug!("-> memory_section! <-");
+        verbose!("-> memory_section! <-");
         let cursor = self.cursor;
         let mut memories = vec![];
 
@@ -468,7 +464,7 @@ impl<'a> Parser<'a> {
             MalformedPayloadLengthInMemorySection
         );
 
-        debug!("(memory_section::payload_len = 0x{:x})", payload_len);
+        verbose!("(memory_section::payload_len = 0x{:x})", payload_len);
 
         // Get the count of memory entries.
         let memory_count = get_value!(
@@ -478,20 +474,20 @@ impl<'a> Parser<'a> {
             MalformedEntryCountInMemorySection
         );
 
-        debug!("(memory_section::memory_count = 0x{:x})", memory_count);
+        verbose!("(memory_section::memory_count = 0x{:x})", memory_count);
 
         // Consume the entries.
         for _ in 0..memory_count {
             memories.push(self.memory_entry()?);
         }
-        debug!("(memory_section::memory_entries = {:?})", memories);
+        verbose!("(memory_section::memory_entries = {:?})", memories);
 
         Ok(Section::Memory(memories))
     }
 
     /// TODO: TEST
     pub fn global_section(&mut self) -> ParserResult<Section> {
-        debug!("-> global_section! <-");
+        verbose!("-> global_section! <-");
         let cursor = self.cursor;
         let mut globals = vec![];
 
@@ -503,7 +499,7 @@ impl<'a> Parser<'a> {
             MalformedPayloadLengthInGlobalSection
         );
 
-        debug!("(global_section::payload_len = 0x{:x})", payload_len);
+        verbose!("(global_section::payload_len = 0x{:x})", payload_len);
 
         // Get the count of global entries,
         let global_count = get_value!(
@@ -513,20 +509,20 @@ impl<'a> Parser<'a> {
             MalformedEntryCountInGlobalSection
         );
 
-        debug!("(global_section::global_count = 0x{:x})", global_count);
+        verbose!("(global_section::global_count = 0x{:x})", global_count);
 
         // Consume the global entries.
         for _ in 0..global_count {
             globals.push(self.global_entry()?);
         }
-        debug!("(global_section::global_entries = {:?})", globals);
+        verbose!("(global_section::global_entries = {:?})", globals);
 
         Ok(Section::Global(globals))
     }
 
     /// TODO: TEST
     pub fn export_section(&mut self) -> ParserResult<Section> {
-        debug!("-> export_section! <-");
+        verbose!("-> export_section! <-");
         let cursor = self.cursor;
         let mut exports = vec![];
 
@@ -538,7 +534,7 @@ impl<'a> Parser<'a> {
             MalformedPayloadLengthInExportSection
         );
 
-        debug!("(export_section::payload_len = 0x{:x})", payload_len);
+        verbose!("(export_section::payload_len = 0x{:x})", payload_len);
 
         // Get the count of export entries.
         let entry_count = get_value!(
@@ -548,13 +544,13 @@ impl<'a> Parser<'a> {
             MalformedEntryCountInExportSection
         );
 
-        debug!("(export_section::entry_count = 0x{:x})", entry_count);
+        verbose!("(export_section::entry_count = 0x{:x})", entry_count);
 
         // Consume the export entries.
         for _ in 0..entry_count {
             exports.push(self.export_entry()?);
         }
-        debug!("(export_section::export_entries = {:?})", exports);
+        verbose!("(export_section::export_entries = {:?})", exports);
 
         // TODO
         Ok(Section::Export(exports))
@@ -562,7 +558,7 @@ impl<'a> Parser<'a> {
 
     /// TODO: TEST
     pub fn start_section(&mut self) -> ParserResult<Section> {
-        debug!("-> start_section! <-");
+        verbose!("-> start_section! <-");
         let cursor = self.cursor;
 
         // The length of the code section in bytes.
@@ -573,7 +569,7 @@ impl<'a> Parser<'a> {
             MalformedPayloadLengthInStartSection
         );
 
-        debug!("(start_section::payload_len = 0x{:x})", payload_len);
+        verbose!("(start_section::payload_len = 0x{:x})", payload_len);
 
         // Get the indes of the start function,
         let function_index = get_value!(
@@ -589,7 +585,7 @@ impl<'a> Parser<'a> {
 
     /// TODO: TEST
     pub fn element_section(&mut self) -> ParserResult<Section> {
-        debug!("-> element_section! <-");
+        verbose!("-> element_section! <-");
         let cursor = self.cursor;
         let mut elements = vec![];
 
@@ -601,7 +597,7 @@ impl<'a> Parser<'a> {
             MalformedPayloadLengthInElementSection
         );
 
-        debug!("(element_section::payload_len = 0x{:x})", payload_len);
+        verbose!("(element_section::payload_len = 0x{:x})", payload_len);
 
         // Get the count of element entries,
         let element_count = get_value!(
@@ -611,16 +607,13 @@ impl<'a> Parser<'a> {
             MalformedEntryCountInElementSection
         );
 
-        debug!(
-            "(element_section::element_count = 0x{:x})",
-            element_count
-        );
+        verbose!("(element_section::element_count = 0x{:x})", element_count);
 
         // Consume the element entries.
         for _ in 0..element_count {
             elements.push(self.element_entry()?);
         }
-        debug!("(element_section::element_entries = {:?})", elements);
+        verbose!("(element_section::element_entries = {:?})", elements);
 
         // TODO
         Ok(Section::Element(elements))
@@ -628,7 +621,7 @@ impl<'a> Parser<'a> {
 
     /// TODO: TEST
     pub fn code_section(&mut self) -> ParserResult<Section> {
-        debug!("-> code_section! <-");
+        verbose!("-> code_section! <-");
         let cursor = self.cursor;
         let mut function_bodies = vec![];
 
@@ -640,7 +633,7 @@ impl<'a> Parser<'a> {
             MalformedPayloadLengthInCodeSection
         );
 
-        debug!("(code_section::payload_len = 0x{:x})", payload_len);
+        verbose!("(code_section::payload_len = 0x{:x})", payload_len);
 
         // Get the count of function bodies.
         let body_count = get_value!(
@@ -650,13 +643,13 @@ impl<'a> Parser<'a> {
             MalformedBodyCountInCodeSection
         );
 
-        debug!("(code_section::entry_count = 0x{:x})", body_count);
+        verbose!("(code_section::entry_count = 0x{:x})", body_count);
 
         // Consume the function bodies.
         for _ in 0..body_count {
             function_bodies.push(self.function_body()?);
         }
-        debug!("(code_section::function_bodies = {:?})", function_bodies);
+        verbose!("(code_section::function_bodies = {:?})", function_bodies);
 
         // TODO
         Ok(Section::Code(function_bodies))
@@ -664,7 +657,7 @@ impl<'a> Parser<'a> {
 
     /// TODO: TEST
     pub fn data_section(&mut self) -> ParserResult<Section> {
-        debug!("-> data_section! <-");
+        verbose!("-> data_section! <-");
         let cursor = self.cursor;
         let mut data = vec![];
 
@@ -676,7 +669,7 @@ impl<'a> Parser<'a> {
             MalformedPayloadLengthInDataSection
         );
 
-        debug!("(data_section::payload_len = 0x{:x})", payload_len);
+        verbose!("(data_section::payload_len = 0x{:x})", payload_len);
 
         // Get the count of data entries,
         let entry_count = get_value!(
@@ -686,16 +679,13 @@ impl<'a> Parser<'a> {
             MalformedEntryCountInDataSection
         );
 
-        debug!(
-            "(data_section::function_count = 0x{:x})",
-            entry_count
-        );
+        verbose!("(data_section::function_count = 0x{:x})", entry_count);
 
         // Consume the function entries.
         for _ in 0..entry_count {
             data.push(self.data_entry()?);
         }
-        debug!("(data_section::data_entries = {:?})", data);
+        verbose!("(data_section::data_entries = {:?})", data);
 
         // TODO
         Ok(Section::Data(data))
@@ -705,7 +695,7 @@ impl<'a> Parser<'a> {
 
     /// TODO: TEST
     pub fn import_entry(&mut self) -> ParserResult<Import> {
-        debug!("-> import_entry! <-");
+        verbose!("-> import_entry! <-");
         let cursor = self.cursor;
         let mut module_name = String::new();
         let mut field_name = String::new();
@@ -718,7 +708,7 @@ impl<'a> Parser<'a> {
             MalformedModuleNameLengthInImportEntry
         );
 
-        debug!("(import_entry::module_len = 0x{:x})", module_len);
+        verbose!("(import_entry::module_len = 0x{:x})", module_len);
 
         {
             // TODO: Validate UTF-8
@@ -732,7 +722,7 @@ impl<'a> Parser<'a> {
                 }
             };
 
-            debug!("import_entry::_module_str = {:?}", module_name);
+            verbose!("import_entry::_module_str = {:?}", module_name);
         }
 
         // Get field name length
@@ -743,7 +733,7 @@ impl<'a> Parser<'a> {
             MalformedFieldNameLengthInImportEntry
         );
 
-        debug!("(import_entry::field_len = 0x{:x})", field_len);
+        verbose!("(import_entry::field_len = 0x{:x})", field_len);
 
         {
             // TODO: Validate UTF-8
@@ -757,7 +747,7 @@ impl<'a> Parser<'a> {
                 }
             };
 
-            debug!("(import_entry::_field_str = {:?})", field_name);
+            verbose!("(import_entry::_field_str = {:?})", field_name);
         }
 
         let external_kind = get_value!(
@@ -793,7 +783,7 @@ impl<'a> Parser<'a> {
 
     /// TODO: TEST
     pub fn function_import(&mut self) -> ParserResult<ImportDesc> {
-        debug!("-> function_import! <-");
+        verbose!("-> function_import! <-");
         let cursor = self.cursor;
         let type_index = get_value!(
             self.varuint32(),
@@ -802,14 +792,14 @@ impl<'a> Parser<'a> {
             MalformedTypeIndexInFunctionImport
         );
 
-        debug!("(function_import::type_index = {:?})", type_index);
+        verbose!("(function_import::type_index = {:?})", type_index);
 
         Ok(ImportDesc::Function { type_index })
     }
 
     /// TODO: TEST
     pub fn table_import(&mut self) -> ParserResult<ImportDesc> {
-        debug!("-> table_import! <-");
+        verbose!("-> table_import! <-");
         let cursor = self.cursor;
         let element_type = Type::from(match self.varint7() {
             Ok(value) => {
@@ -837,7 +827,7 @@ impl<'a> Parser<'a> {
             }
         });
 
-        debug!("(table_import::element_type = {:?})", element_type);
+        verbose!("(table_import::element_type = {:?})", element_type);
 
         // Get limits
         let (minimum, maximum) = match self.limits() {
@@ -855,9 +845,9 @@ impl<'a> Parser<'a> {
             }
         };
 
-        debug!("(table_import::minimum = {:?})", minimum);
+        verbose!("(table_import::minimum = {:?})", minimum);
 
-        debug!("(table_import::maximum = {:?})", maximum);
+        verbose!("(table_import::maximum = {:?})", maximum);
 
         Ok(ImportDesc::Table(Table {
             element_type,
@@ -868,7 +858,7 @@ impl<'a> Parser<'a> {
 
     /// TODO: TEST
     pub fn memory_import(&mut self) -> ParserResult<ImportDesc> {
-        debug!("-> memory_import! <-");
+        verbose!("-> memory_import! <-");
         let cursor = self.cursor;
 
         // Get limits
@@ -891,16 +881,16 @@ impl<'a> Parser<'a> {
             }
         };
 
-        debug!("(memory_import::minimum = {:?})", minimum);
+        verbose!("(memory_import::minimum = {:?})", minimum);
 
-        debug!("(memory_import::maximum = {:?})", maximum);
+        verbose!("(memory_import::maximum = {:?})", maximum);
 
         Ok(ImportDesc::Memory(Memory { minimum, maximum }))
     }
 
     /// TODO: TEST
     pub fn global_import(&mut self) -> ParserResult<ImportDesc> {
-        debug!("-> global_import! <-");
+        verbose!("-> global_import! <-");
         let cursor = self.cursor;
 
         let content_type = Type::from(get_value!(
@@ -910,7 +900,7 @@ impl<'a> Parser<'a> {
             MalformedContentTypeInGlobalImport
         ));
 
-        debug!("(global_import::content_type = {:?})", content_type);
+        verbose!("(global_import::content_type = {:?})", content_type);
         let mutability = get_value!(
             self.varuint1(),
             cursor,
@@ -918,7 +908,7 @@ impl<'a> Parser<'a> {
             MalformedMutabilityInGlobalImport
         );
 
-        debug!("(global_import::mutability = {:?})", mutability);
+        verbose!("(global_import::mutability = {:?})", mutability);
 
         Ok(ImportDesc::Global {
             content_type,
@@ -964,7 +954,11 @@ impl<'a> Parser<'a> {
             }
         };
 
-        Ok(Table { element_type: element_type.into(), minimum, maximum })
+        Ok(Table {
+            element_type: element_type.into(),
+            minimum,
+            maximum,
+        })
     }
 
     /// TODO: TEST
@@ -992,7 +986,7 @@ impl<'a> Parser<'a> {
 
     /// TODO: TEST
     pub fn global_entry(&mut self) -> ParserResult<Global> {
-        debug!("-> global_entry! <-");
+        verbose!("-> global_entry! <-");
         let cursor = self.cursor;
 
         // Get content type
@@ -1003,7 +997,7 @@ impl<'a> Parser<'a> {
             MalformedContentTypeInGlobalEntry
         ));
 
-        debug!("(global_entry::content_type = {:?})", content_type);
+        verbose!("(global_entry::content_type = {:?})", content_type);
 
         // Get mutability
         let mutability = get_value!(
@@ -1013,7 +1007,7 @@ impl<'a> Parser<'a> {
             MalformedMutabilityInGlobalEntry
         );
 
-        debug!("(global_entry::mutability = {:?})", mutability);
+        verbose!("(global_entry::mutability = {:?})", mutability);
 
         // Consume instructions
         let instructions = self.instructions()?;
@@ -1029,7 +1023,7 @@ impl<'a> Parser<'a> {
 
     /// TODO: TEST
     pub fn export_entry(&mut self) -> ParserResult<Export> {
-        debug!("-> export_entry! <-");
+        verbose!("-> export_entry! <-");
         let cursor = self.cursor;
         let mut name = String::new();
 
@@ -1041,7 +1035,7 @@ impl<'a> Parser<'a> {
             MalformedNameLengthInExportEntry
         );
 
-        debug!("(export_entry::name_len = 0x{:x})", name_len);
+        verbose!("(export_entry::name_len = 0x{:x})", name_len);
 
         {
             // TODO: Validate UTF-8
@@ -1055,7 +1049,7 @@ impl<'a> Parser<'a> {
                 }
             };
 
-            debug!("export_entry::name = {:?}", name);
+            verbose!("export_entry::name = {:?}", name);
         }
 
         let export_kind = get_value!(
@@ -1065,7 +1059,7 @@ impl<'a> Parser<'a> {
             MalformedExportKindInExportEntry
         );
 
-        debug!("export_entry::export_kind = {:?}", export_kind);
+        verbose!("export_entry::export_kind = {:?}", export_kind);
 
         let index = get_value!(
             self.varuint32(),
@@ -1074,7 +1068,7 @@ impl<'a> Parser<'a> {
             MalformedExportIndexInExportEntry
         );
 
-        debug!("export_entry::index = {:?}", index);
+        verbose!("export_entry::index = {:?}", index);
 
         let desc = match export_kind {
             // Function export
@@ -1100,7 +1094,7 @@ impl<'a> Parser<'a> {
 
     /// TODO: TEST
     pub fn element_entry(&mut self) -> ParserResult<Element> {
-        debug!("-> element_entry! <-");
+        verbose!("-> element_entry! <-");
         let cursor = self.cursor;
         let mut func_indices = vec![];
 
@@ -1112,7 +1106,7 @@ impl<'a> Parser<'a> {
             MalformedTableIndexInElementEntry
         );
 
-        debug!("(element_entry::table_index = 0x{:x})", table_index);
+        verbose!("(element_entry::table_index = 0x{:x})", table_index);
 
         // Consume code.
         let instructions = self.instructions()?;
@@ -1125,7 +1119,7 @@ impl<'a> Parser<'a> {
             MalformedFunctionCountInElementEntry
         );
 
-        debug!("(element_entry::func_count = 0x{:x})", func_count);
+        verbose!("(element_entry::func_count = 0x{:x})", func_count);
 
         // Consume function indices
         for _ in 0..func_count {
@@ -1139,7 +1133,11 @@ impl<'a> Parser<'a> {
             func_indices.push(func_index);
         }
 
-        Ok(Element { table_index, instructions, func_indices })
+        Ok(Element {
+            table_index,
+            instructions,
+            func_indices,
+        })
     }
 
     /******** CODE ********/
@@ -1147,7 +1145,7 @@ impl<'a> Parser<'a> {
     /// TODO: TEST
     /// Each function body corresponds to the functions declared in the function section.
     pub fn function_body(&mut self) -> ParserResult<Function> {
-        debug!("-> function_body! <-");
+        verbose!("-> function_body! <-");
         let cursor = self.cursor;
         let mut locals = vec![];
 
@@ -1159,7 +1157,7 @@ impl<'a> Parser<'a> {
             MalformedBodySizeInFunctionBody
         );
 
-        debug!("(function_body::body_size = 0x{:x})", body_size);
+        verbose!("(function_body::body_size = 0x{:x})", body_size);
 
         // Start position of body bytes.
         let start_pos = self.cursor;
@@ -1172,7 +1170,7 @@ impl<'a> Parser<'a> {
             MalformedBodySizeInFunctionBody
         );
 
-        debug!("(function_body::local_count = 0x{:x})", local_count);
+        verbose!("(function_body::local_count = 0x{:x})", local_count);
 
         // Consume locals.
         for _ in 0..local_count {
@@ -1201,7 +1199,7 @@ impl<'a> Parser<'a> {
 
     /// TODO: TEST
     pub fn local_entry(&mut self) -> ParserResult<Local> {
-        debug!("-> local_entry! <-");
+        verbose!("-> local_entry! <-");
         let cursor = self.cursor;
 
         // Get count of locals with similar types.
@@ -1212,7 +1210,7 @@ impl<'a> Parser<'a> {
             MalformedCountInLocalEntry
         );
 
-        debug!("(local_entry::count = 0x{:x})", count);
+        verbose!("(local_entry::count = 0x{:x})", count);
 
         // Get type of the locals.
         let local_type = Type::from(get_value!(
@@ -1222,14 +1220,14 @@ impl<'a> Parser<'a> {
             MalformedLocalTypeInLocalEntry
         ));
 
-        debug!("(local_entry::local_type = {:?})", local_type);
+        verbose!("(local_entry::local_type = {:?})", local_type);
 
         Ok(Local { count, local_type })
     }
 
     /// TODO: TEST
     pub fn instructions(&mut self) -> ParserResult<Vec<Operator>> {
-        debug!("-> instructions! <-");
+        verbose!("-> instructions! <-");
         let cursor = self.cursor;
         let mut operators = vec![];
 
@@ -1241,7 +1239,7 @@ impl<'a> Parser<'a> {
                 MalformedOpcodeInExpression
             );
 
-            debug!("(instructions::opcode = 0x{:x})", opcode);
+            verbose!("(instructions::opcode = 0x{:x})", opcode);
 
             // If opcode is an end byte. Break!
             if opcode == 0x0b {
@@ -1450,7 +1448,7 @@ impl<'a> Parser<'a> {
 
     /// TODO: TEST
     pub fn data_entry(&mut self) -> ParserResult<Data> {
-        debug!("-> data_entry! <-");
+        verbose!("-> data_entry! <-");
         let cursor = self.cursor;
 
         // Get memory index.
@@ -1461,7 +1459,7 @@ impl<'a> Parser<'a> {
             MalformedTableIndexInDataEntry
         );
 
-        debug!("(data_entry::memory_index = 0x{:x})", memory_index);
+        verbose!("(data_entry::memory_index = 0x{:x})", memory_index);
 
         // Consume code.
         let instructions = self.instructions()?;
@@ -1474,22 +1472,31 @@ impl<'a> Parser<'a> {
             MalformedByteCountInDataEntry
         );
 
-        debug!("(data_entry::func_count = 0x{:x})", byte_count);
+        verbose!("(data_entry::func_count = 0x{:x})", byte_count);
 
         // Consume bytes.
         let bytes = match self.eat_bytes(byte_count as _) {
             Some(value) => value.to_vec(),
-            None => return Err(ParserError { kind: ErrorKind::IncompleteDataEntry, cursor }),
+            None => {
+                return Err(ParserError {
+                    kind: ErrorKind::IncompleteDataEntry,
+                    cursor,
+                });
+            }
         };
 
-        Ok(Data { memory_index, instructions, bytes })
+        Ok(Data {
+            memory_index,
+            instructions,
+            bytes,
+        })
     }
 
     /******** TYPES ********/
 
     /// TODO: TEST
     pub fn limits(&mut self) -> Result<(u32, Option<u32>), ParserError> {
-        // debug!("-> limits! <-");
+        // verbose!("-> limits! <-");
         let cursor = self.cursor;
         let flags = get_value!(
             self.varuint1(),
@@ -1533,7 +1540,7 @@ impl<'a> Parser<'a> {
     /// TODO: TEST
     /// TODO: Supports a single return type for now.
     pub fn func_type(&mut self) -> ParserResult<Type> {
-        // debug!("-> func_type! <-");
+        // verbose!("-> func_type! <-");
         let cursor = self.cursor;
         let mut params = vec![];
         let mut returns = vec![];
@@ -1546,7 +1553,7 @@ impl<'a> Parser<'a> {
             MalformedParamCountInFunctionType
         );
 
-        debug!("(func_type::param_count = 0x{:x})", param_count);
+        verbose!("(func_type::param_count = 0x{:x})", param_count);
 
         // Get param types.
         for _ in 0..param_count {
@@ -1559,7 +1566,7 @@ impl<'a> Parser<'a> {
 
             params.push(param_type);
         }
-        debug!("(func_type::param_types = {:?})", params);
+        verbose!("(func_type::param_types = {:?})", params);
 
         // Get return count.
         let return_count = get_value!(
@@ -1569,7 +1576,7 @@ impl<'a> Parser<'a> {
             MalformedReturnCountInFunctionType
         );
 
-        debug!("(func_type::return_count = {:?})", return_count);
+        verbose!("(func_type::return_count = {:?})", return_count);
 
         // Get return types.
         for _ in 0..return_count {
@@ -1582,14 +1589,14 @@ impl<'a> Parser<'a> {
 
             returns.push(return_type);
         }
-        debug!("(func_type::return_types = {:?})", returns);
+        verbose!("(func_type::return_types = {:?})", returns);
 
         Ok(Type::Func { params, returns })
     }
 
     /// TODO: TEST
     pub fn value_type(&mut self) -> Result<i8, ErrorKind> {
-        // debug!("-> value_type! <-");
+        // verbose!("-> value_type! <-");
         let value = self.varint7()?;
 
         // i32, i64, f32, f64
@@ -1602,7 +1609,7 @@ impl<'a> Parser<'a> {
 
     /// TODO: TEST
     pub fn external_kind(&mut self) -> Result<u8, ErrorKind> {
-        debug!("-> external_kind! <-");
+        verbose!("-> external_kind! <-");
 
         let value = self.uint8()?;
 
@@ -1748,7 +1755,7 @@ impl<'a> Parser<'a> {
 
     /// Consumes 1-5 bytes that represent a 32-bit LEB128 unsigned integer encoding
     pub fn varuint32(&mut self) -> Result<u32, ErrorKind> {
-        // debug!("-> varuint32! <-");
+        // verbose!("-> varuint32! <-");
         let mut result = 0;
         let mut shift = 0;
         while shift < 35 {
@@ -1756,7 +1763,7 @@ impl<'a> Parser<'a> {
                 Some(value) => value,
                 None => return Err(ErrorKind::BufferEndReached),
             };
-            // debug!("(count = {}, byte = 0b{:08b})", count, byte);
+            // verbose!("(count = {}, byte = 0b{:08b})", count, byte);
             // Unset the msb and shift by multiples of 7 to the left
             let value = ((byte & !0b1000_0000) as u32) << shift;
             result |= value;
@@ -1791,7 +1798,7 @@ impl<'a> Parser<'a> {
 
     /// Consumes 1-5 bytes that represent a 32-bit LEB128 signed integer encoding
     pub fn varint32(&mut self) -> Result<i32, ErrorKind> {
-        // debug!("-> varint32! <-");
+        // verbose!("-> varint32! <-");
         let mut result = 0;
         let mut shift = 0;
         // Can consume at most 5 bytes
@@ -1801,7 +1808,7 @@ impl<'a> Parser<'a> {
                 Some(value) => value,
                 None => return Err(ErrorKind::BufferEndReached),
             };
-            // debug!("(count = {}, byte = 0b{:08b})", count, byte);
+            // verbose!("(count = {}, byte = 0b{:08b})", count, byte);
             // Unset the msb and shift by multiples of 7 to the left
             let value = ((byte & !0b1000_0000) as i32) << shift;
             result |= value;
@@ -1825,7 +1832,7 @@ impl<'a> Parser<'a> {
     /// TODO: TEST
     /// Consumes 1-9 bytes that represent a 64-bit LEB128 signed integer encoding
     pub fn varint64(&mut self) -> Result<i64, ErrorKind> {
-        // debug!("-> varint64! <-");
+        // verbose!("-> varint64! <-");
         let mut result = 0;
         let mut shift = 0;
         // Can consume at most 9 bytes
@@ -1835,7 +1842,7 @@ impl<'a> Parser<'a> {
                 Some(value) => value,
                 None => return Err(ErrorKind::BufferEndReached),
             };
-            // debug!("(count = {}, byte = 0b{:08b})", count, byte);
+            // verbose!("(count = {}, byte = 0b{:08b})", count, byte);
             // Unset the msb and shift by multiples of 7 to the left
             let value = ((byte & !0b1000_0000) as i64) << shift;
             result |= value;

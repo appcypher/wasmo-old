@@ -1,7 +1,5 @@
 ///
-pub struct Builder {
-
-}
+pub struct Builder {}
 
 ///
 impl Builder {

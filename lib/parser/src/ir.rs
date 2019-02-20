@@ -21,7 +21,10 @@ impl From<i8> for Type {
             -0x03 => Type::F32,
             -0x04 => Type::F64,
             -0x10 => Type::FuncRef,
-            -0x20 => Type::Func { params: vec![], returns: vec![] },
+            -0x20 => Type::Func {
+                params: vec![],
+                returns: vec![],
+            },
             -0x40 => Type::Empty,
             _ => unreachable!(),
         }
@@ -110,7 +113,6 @@ pub struct Element {
     pub instructions: Vec<Operator>,
     pub func_indices: Vec<u32>,
 }
-
 
 ///
 #[derive(Debug, Clone)]
