@@ -32,7 +32,7 @@ Running a wasm file with the wasabi (llvm/musl) abi.
 wasmlite server.wasm --abi=wasabi
 ```
 
-The wasabi abi is the default.
+The emscripten abi is the default (?).
 
 #### PASSING ARGUMENTS TO WASM APPLICATION
 Passing arguments to a wasm application
@@ -40,7 +40,3 @@ Passing arguments to a wasm application
 wasmlite server.wasm -- 8080
 ```
 
-
-### ISSUES
-#### PARSING
-- Improve wasmlite-parser error reporting
