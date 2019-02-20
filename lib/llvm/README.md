@@ -10,6 +10,13 @@
 - [ ] Proper planning of wasm memory model (page reservation and guard page)
 
 
+#### STRUCTURE
+Context
+    * new
+    * 
+    * type_*
+
+
 #### PROCESS ADDRESS SPACE (LINUX x86-64 EXAMPLE)
 
 ```

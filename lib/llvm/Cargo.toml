@@ -16,3 +16,4 @@ homepage = "https://github.com/appcypher/wasmlite"
 [dependencies]
 llvm-sys = "60"
 wasmlite-parser = { path = "../parser" }
+wasmlite-utils = { path = "../utils" }

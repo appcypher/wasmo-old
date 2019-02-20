@@ -17,6 +17,7 @@ license = "Apache-2.0"
 wasmlite-parser = { path = "lib/parser" }
 wasmlite-llvm = { path = "lib/llvm" }
 wasmlite-utils = { path = "lib/utils" }
+wabt = "0.7.4" # Only there for converting .wat to .wasm
 
 [features]
 debug = []

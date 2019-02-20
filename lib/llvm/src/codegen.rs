@@ -1,84 +1,19 @@
-use llvm_sys::{
-    LLVMContext,
-    LLVMModule,
-    LLVMBuilder,
-    core::{
-        LLVMContextCreate,
-        LLVMModuleCreateWithNameInContext,
-        LLVMCreateBuilderInContext,
-        LLVMContextDispose,
-        LLVMDisposeModule,
-        LLVMDisposeBuilder
-    },
-};
+use wasmlite_utils::*;
 
-use wasmlite_parser::parser::Parser;
+use wasmlite_parser::ir;
 
-///
-pub struct LLVMCodegen {
-    context: *mut LLVMContext,
-    module: *mut LLVMModule,
-    builder: *mut LLVMBuilder,
-}
+use crate::module::Module;
 
-impl LLVMCodegen {
-    ///
-    pub fn new(module_name: &str) -> Self {
-        unsafe {
-            let context = LLVMContextCreate();
-            let module = LLVMModuleCreateWithNameInContext(module_name.as_ptr() as *const _, context);
-            let builder = LLVMCreateBuilderInContext(context);
-            Self { context, module, builder }
-        }
-    }
+use crate::context::Context;
 
-    ///
-    pub fn get_refs() -> () {
-        ()
-    }
+pub fn generate_module(_wasm_module: &ir::Module) -> () {
+    let context = Context::create();
 
-    ///
-    pub fn get_wasm_ir(code: &[u8]) -> () {
-        let mut parser = Parser::new(code);
-        let wasm_ir = parser.module();
-        println!("wasm_ir = {:#?}", wasm_ir);
-        ()
-    }
+    debug!("context = {:#?}\n", context);
 
-    ///
-    pub fn target_triple() -> () {
-        ()
-    }
+    let module = context.create_module("Hello LLVM");
 
-    ///
-    pub fn generate_instructions() -> () {
-        ()
-    }
+    debug!("module = {:#?}\n", module);
 
-    ///
-    pub fn dispose_context() -> () {
-        ()
-    }
-
-    ///
-    pub fn dispose_module() -> () {
-        ()
-    }
-
-    ///
-    pub fn dispose_builder() -> () {
-        ()
-    }
-}
-
-// TODO: My drop implementation segfaults!
-impl Drop for LLVMCodegen {
-    /// Dispose builder, context and module.
-    fn drop(&mut self) {
-        unsafe {
-            LLVMContextDispose(self.context);
-            LLVMDisposeModule(self.module);
-            LLVMDisposeBuilder(self.builder);
-        }
-    }
+    ()
 }

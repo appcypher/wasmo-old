@@ -1,15 +1,14 @@
 
-# WASMLITE (WASM TO LLVM)
+# WASMLITE
 This project aims to provide the necessary tools for compiling wasm binary to LLVM IR which can further be compiled to machine-specific code.
 
 This project is supposed to make it easy for languages compiling to wasm to take advantage of the LLVM infrastructure.
 
 It also allows stripping of expensive wasm runtime elements for times when full wasm specification is not desired.
 
-Lastly, it is a platform for learning about WebAssembly, LLVM and how they can play well together.
+Lastly, it is a platform for learning about WebAssembly, LLVM and how they play well together.
 
 ### POSSIBLE API (NOT FINAL)
-#### COMPILATION PIPELINE
 ```rust
 // Create compiler flags.
 let compiler_flags = Some(CompilerOptions {
@@ -24,14 +23,14 @@ let compiler_flags = Some(CompilerOptions {
     strategy: CompilationStrategy::Normal,
 });
 
-// Create wasm instance options.
-let instance_options = Some(InstanceOptions {
+// Create wasm options.
+let options = Some(InstanceOptions {
     compiler_flags,
-    abi: vec![ABI::LLVMMusl],
+    abi: vec![ABI::Wasabi],
 });
 
 // JIT compile module in current process.
-let (module, instance) = Runtime::instantiate(wasm_binary, imports, instance_options);
+let (module, instance) = Runtime::instantiate(wasm_binary, imports, options);
 
 // Get the exported main function from instance.
 let main = instance.get_func("main");
@@ -43,63 +42,8 @@ let wasm_array = instance.set_array(&arguments);
 main.call(5, wasm_array);
 ```
 
-#### COMPILATION TYPES
-##### AOT COMPILATIONS
-```rust
-// Create compiler flags.
-let compiler_flags = Some(CompilerOptions {
-    strategy: CompilationStrategy::AheadOfTime,
-    ..
-});
-
-// Create wasm instance options.
-let instance_options = Some(InstanceOptions { compiler_flags, .. });
-
-// instance holds an in-memory object code of the entire wasm program.
-// Possibly generates a dylib for known imports as well.
-let (module, instantiate) = Runtime::instantiate(wasm_binary, imports, instance_options);
-
-// Create executables.
-let (imports_dylib, wasm_exe) = module.create_executables();
-```
-
-##### LAZY COMPILATION
-```rust
-// Create compiler flags.
-let compiler_flags = Some(CompilerOptions {
-    strategy: CompilationStrategy::LazyCompilation,
-    ..
-});
-
-// Create wasm instance options.
-let instance_options = Some(InstanceOptions { compiler_flags, .. });
-
-// Functions are not compiled until their first call.
-let (module, instance) = Runtime::instantiate(wasm_binary, imports, instance_options);
-```
-
-##### REPL-TYPE LAZY COMPILATION
-```rust
-// Create compiler flags.
-let compiler_flags = Some(CompilerOptions {
-    strategy: CompilationStrategy::REPL,
-    ..
-});
-
-// Create wasm instance options.
-let instance_options = Some(InstanceOptions { compiler_flags, .. });
-
-// Lazily compiles the entire wasm instance.
-let (module, instance) = Runtime::instantiate(wasm_binary, imports, instance_options);
-
-// ???
-let func = module.add_function(wasm_function_binary, instance);
-let expression = module.add_expression(wasm_expression_binary, instance);
-```
-
 ### NON_GOAL
 - Have multiple backends
-
 
 ### CURRENT SUPPORT
 - [ ] Parser
@@ -139,6 +83,6 @@ let expression = module.add_expression(wasm_expression_binary, instance);
 - error messages and making error position point of error instead of start_position
 
 ### ATTRIBUTIONS
-- [inkwell] - inspired the LLVM codegen section
-- [wasmer] - takes some design cues from this similar project
-- [wasmtime] - takes some design cues from this similar project as well
+- [inkwell](https://github.com/TheDan64/inkwell) - inspired the LLVM codegen section
+- [wasmer](https://github.com/wasmerio/wasmer) - takes some design cues from this similar project
+- [wasmtime](https://github.com/CraneStation/wasmtime) - takes some design cues from this similar project as well
