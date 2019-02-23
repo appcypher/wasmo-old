@@ -2,4 +2,4 @@
 pub enum LinkError {}
 
 ///
-pub enum RUntimeError {}
+pub enum RuntimeError {}

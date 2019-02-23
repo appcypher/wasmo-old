@@ -1,3 +1,12 @@
+
+## TODO
+MEMORY MANAGEMENT
+- A way to free the `reference` Module after instantiation unless it has been referenced elsewhere
+- Freeing the Instance-owned module for non-lazy modes.
+
+-------------------------------------------------------------------
+
+
 _Pseudocode in Astro for clarity_
 
 ## PIPELINE
@@ -21,46 +30,37 @@ MODULE —— IMPORTS
 // - Allows relocation at instantiation time or at runtime
 // - llvm.Module sorts members by types. e.g. imports are sorted by types.
 // - things are not ordered according to the wasm module intead they are ordered based on how the runtime frequently access them
-derive!(Clone)
 type Module {
   llvm_ir: llvm.Module?, // Disposable (ORC?)
   exports: Exports,
-  descs: ModuleDescriptions, // Cloneable
+  desc: ModuleDesc, // Cloneable
 }
 ```
 
 ##### EXPORTS
 ```kotlin
 type Exports = (GuestTables, GuestFunctions, ...)
+
+type GuestTables = [(String, Ptr, TableDesc)]
 ```
 
-##### GUEST DATA
-```kotlin
-struct GuestTables {
-    tables: [(String, Ptr, ref TableDesc)]
-}
-```
-
-##### MODULE DESCRIPTIONS
+##### MODULE DESCRIPTION
 ```rust
-derive!(Clone)
-type ModuleDecriptions {
-    tables,
-    memories,
-    globals,
-    functions,
+type ModuleDesc {
+    tables, // Don't contain imports
+    memories, // Don't contain imports
+    globals, // Don't contain imports
+    functions, // Don't contain imports
     imports,
     exports,
 }
 ```
 
-```rust
-derive!(Clone)
-type ImportDecriptions {
+```kotlin
+type ImportDesc = (TableDescs, FunctionDescs, ...)
 
-}
+type TableDescs = [(String, String, TableDesc)]
 ```
-
 
 
 ##### INSTANCE
@@ -81,7 +81,7 @@ type Instance {
 type Data { // mmap'd / VirtualAlloc'd
     memories: **UInt8,
     tables: *Seq[UInt32],
-    globals: *UInt,
+    globals: *UInt64,
 }
 ```
 
@@ -215,13 +215,10 @@ instance.call("func") // `func` is lazy-compiled
 ## IMPORTS AND ABI
 ##### IMPORTS
 ```kotlin
-type Imports = Dict[String, (HostTables, HostFunctions, ...)]
-```
+type Imports = (HostTables, HostFunctions, ...)
 
-##### GUEST DATA
-```kotlin
 enum HostTables {
-    tables: [(String, Ptr, ref TableDesc)]
+    tables: [(String, String, Ptr, TableDesc)]
 }
 ```
 

@@ -16,6 +16,8 @@ license = "Apache-2.0"
 [dependencies]
 wasmlite-llvm = { path = "../llvm" }
 wasmlite-utils = { path = "../utils" }
+wasmlite-parser = { path = "../parser" }
+libc = "0.2.49"
 
 [features]
 debug = []
