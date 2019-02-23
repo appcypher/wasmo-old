@@ -45,14 +45,21 @@
 (module
   (type (func (param i32 i64) (result i32)))
   (table 1 anyfunc)
-  (memory 1 2) ;; memory with maximum
+  (memory 4 70) ;; memory with maximum
 )
 
 ;; valid_module_with_memory_section_no_maximum
 (module
   (type (func (param i32 i64) (result i32)))
   (table 1 anyfunc)
-  (memory 1) ;; memory with no maximum
+  (memory 65535) ;; memory with no maximum
+)
+
+;; valid_module_with_memory_section_and_maximum
+(module
+  (type (func (param i32 i64) (result i32)))
+  (table 1 anyfunc)
+  (memory 4 70) ;; memory with maximum
 )
 
 ;; valid_module_with_locals_in_function_body

@@ -1,19 +1,28 @@
-use wasmlite_utils::*;
+use wasmlite_utils::debug;
 
 use wasmlite_parser::ir;
 
-use crate::module::Module;
+use crate::{
+    Module,
+    Context,
+    Builder,
+    execution_engine,
 
-use crate::context::Context;
+};
+
+type SumFunc = unsafe extern "C" fn(u64, u64, u64) -> u64;
 
 pub fn generate_module(_wasm_module: &ir::Module) -> () {
     let context = Context::create();
 
-    debug!("context = {:#?}\n", context);
-
     let module = context.create_module("Hello LLVM");
 
-    debug!("module = {:#?}\n", module);
+    let builder = context.create_builder();
+
+    let f64_type = context.f64_type();
 
     ()
 }
+
+
+// pub fn jit_compile_sum(context: &Context, module: &Module, builder: Builder) -> JITFunction<SumFunc> {}

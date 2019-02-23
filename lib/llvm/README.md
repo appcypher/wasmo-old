@@ -10,14 +10,10 @@
 - [ ] Proper planning of wasm memory model (page reservation and guard page)
 
 
-#### STRUCTURE
-Context
-    * new
-    * 
-    * type_*
+-------------------------------------------------------------------
 
 
-#### PROCESS ADDRESS SPACE (LINUX x86-64 EXAMPLE)
+## PROCESS ADDRESS SPACE (LINUX x86-64 EXAMPLE)
 
 ```
 +++++++++++++++++++++++++++
@@ -28,7 +24,7 @@ Context
 |          HEAP
 |
 |
-|  ++++++ INSTANCE ++++++
+|  ++++ WASM INSTANCE +++
 |  ++++++++++++++++++++++
 |  |                    |
 |  |    LINEAR MEMORY   | RW
@@ -36,11 +32,11 @@ Context
 |  ++++++++++++++++++++++
 |            :
 |  ++++++++++++++++++++++
-|  |      GLOBALS       | R
+|  |      GLOBALS       | RW
 |  ++++++++++++++++++++++
 |            :
 |  ++++++++++++++++++++++
-|  |       TABLES       | R
+|  |       TABLE        | R
 |  ++++++++++++++++++++++
 |            :
 |  ++++++++++++++++++++++
@@ -55,3 +51,38 @@ Context
 |      TEXT SEGMENT
 +++++++++++++++++++++++++++
 ```
+
+-------------------------------------------------------------------
+
+## CALLING CONVENTION
+
+
+-------------------------------------------------------------------
+
+## TRAPS AND EXCEPTIONS
+Things that can generate traps
+- Code-generated traps for illegal arithmetic operations, OOB accesses, etc.
+- OS-generated traps for illegal memory access
+- Host-generated traps
+
+A list of things that can trap at runtime:
+- ...
+
+
+-------------------------------------------------------------------
+
+## THREADS AND ATOMICS
+
+
+
+-------------------------------------------------------------------
+
+## SIMD
+
+
+-------------------------------------------------------------------
+
+
+## DEBUGINFO
+
+

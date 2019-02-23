@@ -9,7 +9,7 @@ use crate::{
     macros,
     validation::validate_section_exists,
 };
-use wasmlite_utils::*;
+use wasmlite_utils::{debug, verbose};
 
 // TODO
 //  - Improve error reporting.

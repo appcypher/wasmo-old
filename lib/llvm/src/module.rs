@@ -8,19 +8,24 @@ use llvm_sys::core::{
 
 use llvm_sys::prelude::{LLVMContextRef, LLVMModuleRef};
 
-use wasmlite_utils::*;
+use wasmlite_utils::debug;
 
-use crate::context::Context;
+use crate::{
+    Context,
+    types::FunctionType,
+    values::FunctionValue,
+};
 
 ///
-#[derive(Debug, PartialEq, Eq)]
+/// TODO:IMPORTANT: Can the Rc be gotten rid of. Does EE own module? 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Module {
-    pub(crate) module: Rc<LLVMModuleRef>,
+    module: Rc<LLVMModuleRef>,
     context_ref: Option<Context>,
 }
 
-///
 impl Module {
+    /// Shares context
     pub fn new(module: LLVMModuleRef, context: Option<&Context>) -> Self {
         assert!(!module.is_null());
 
@@ -30,12 +35,19 @@ impl Module {
         }
     }
 
-    pub fn create(name: &str) -> Module {
-        let name = CString::new(name).expect("Conversion to CString failed");
+    pub fn create(name: &str) -> Self {
+        let name = CString::new(name).expect("CString conversion failed");
 
         let module = unsafe { LLVMModuleCreateWithName(name.as_ptr()) };
 
         Module::new(module, None)
+    }
+
+    /// Consumes type
+    pub fn add_function(&self, function_name: &str, type_: FunctionType) -> FunctionValue {
+        let name = CString::new(function_name).expect("CString conversion failed");
+
+        unimplemented!()
     }
 }
 

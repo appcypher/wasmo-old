@@ -1,6 +1,6 @@
 use std::env;
 
-use wasmlite_utils::*;
+use wasmlite_utils::verbose;
 
 fn main() {
     println!("\n=== [ wasmlite ] ===\n");

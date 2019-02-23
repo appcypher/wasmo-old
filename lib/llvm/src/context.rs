@@ -1,19 +1,25 @@
+
 use std::rc::Rc;
 
 use std::ffi::CString;
 
-use llvm_sys::core::{LLVMContextCreate, LLVMContextDispose, LLVMModuleCreateWithNameInContext};
+use llvm_sys::core::{LLVMContextCreate, LLVMContextDispose, LLVMModuleCreateWithNameInContext, LLVMCreateBuilderInContext,
+LLVMInt32TypeInContext, LLVMInt64TypeInContext, LLVMFloatTypeInContext, LLVMDoubleTypeInContext};
 
-use llvm_sys::prelude::{LLVMContextRef, LLVMModuleRef};
+use llvm_sys::prelude::{LLVMContextRef, LLVMTypeRef};
 
-use wasmlite_utils::*;
+use wasmlite_utils::debug;
 
-use crate::module::Module;
+use crate::{
+    Module,
+    Builder,
+    types::{I32Type, I64Type, F32Type, F64Type},
+};
 
 ///
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Context {
-    pub(crate) context: Rc<LLVMContextRef>,
+    context: Rc<LLVMContextRef>,
 }
 
 ///
@@ -28,6 +34,10 @@ impl Context {
         }
     }
 
+    pub(crate) fn as_ptr(&self) -> LLVMContextRef {
+        *self.context
+    }
+
     pub fn create_module(&self, name: &str) -> Module {
         let name = CString::new(name).expect("Conversion to CString failed");
 
@@ -36,28 +46,34 @@ impl Context {
         Module::new(module, Some(self))
     }
 
-    pub(crate) fn as_ptr(&self) -> LLVMContextRef {
-        *self.context
+    pub fn create_builder(&self) -> Builder {
+        let builder = unsafe { LLVMCreateBuilderInContext(*self.context) };
+
+        Builder::new(builder, Some(self))
     }
 
-    pub fn create_builder() -> () {
-        ()
+    pub fn i32_type(&self) -> I32Type {
+        let type_ = unsafe { LLVMInt32TypeInContext(*self.context) };
+
+        I32Type::new(type_)
     }
 
-    pub fn type_i32() -> () {
-        ()
+    pub fn i64_type(&self) -> I64Type {
+        let type_ = unsafe { LLVMInt64TypeInContext(*self.context) };
+
+        I64Type::new(type_)
     }
 
-    pub fn type_i64() -> () {
-        ()
+    pub fn f32_type(&self) -> F32Type {
+        let type_ = unsafe { LLVMFloatTypeInContext(*self.context) };
+
+        F32Type::new(type_)
     }
 
-    pub fn type_f32() -> () {
-        ()
-    }
+    pub fn f64_type(&self) -> F64Type {
+        let type_ = unsafe { LLVMDoubleTypeInContext(*self.context) };
 
-    pub fn type_f64() -> () {
-        ()
+        F64Type::new(type_)
     }
 }
 
