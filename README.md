@@ -33,17 +33,17 @@ Lastly, it is a platform for learning about WebAssembly, LLVM and how they play 
     ```
 
     ```bash
-    bash wasmtorch.sh install "path/to/llvm"
+    bash lite.sh install "path/to/llvm"
     ```
 
     This command does the following:
     - builds the `wasmlite` project.
-    - installs necessary commands like `wasmlite`, and `wasmtorch`.
+    - installs necessary commands like `wasmlite`, and `lite`.
 
-- After a successful install you should be able to use the `wasmtorch.sh` script via the `wasmtorch` command.
+- After a successful install you should be able to use the `lite.sh` script via the `lite` command.
 
     ```bash
-    wasmtorch --help
+    lite --help
     ```
 
 - You can also use `wasmlite` command now.
@@ -75,7 +75,7 @@ Lastly, it is a platform for learning about WebAssembly, LLVM and how they play 
     cd wasmlite
     ```
 
-    - `wasmtorch.bat` is still in works, but for now
+    - `lite.bat` is still in works, but for now
     - open the command prompt or terminal and run the following command:
 
     ```bash
@@ -177,7 +177,12 @@ main.call(5, wasm_array);
 
 - error messages and making error position point of error instead of start_position
 
+###
+
 ### ATTRIBUTIONS
-- [inkwell](https://github.com/TheDan64/inkwell) - inspired the LLVM codegen section
-- [wasmer](https://github.com/wasmerio/wasmer) - takes some design cues from this similar project
-- [wasmtime](https://github.com/CraneStation/wasmtime) - takes some design cues from this similar project as well
+These are the nice projects `wasmlite` references for design
+- [inkwell](https://github.com/TheDan64/inkwell) [Apache-2.0] - the LLVM codegen section is inspired by this cool project
+- [wasmer](https://github.com/wasmerio/wasmer) [MIT] - design cues taken from this similar project
+- [wasmtime](https://github.com/CraneStation/wasmtime) [Apache-2.0] - design cues taken from this similar project
+
+If you are interested in this project, you should probably check out [WAVM](https://github.com/WAVM/WAVM) as well.

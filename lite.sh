@@ -42,9 +42,11 @@ main() {
 #	Prints helpful information about the setup script
 help() {
     echo ""
-    echo " ========================= WASMTORCH ============================"
+    echo " =========================== lite ==============================="
     echo "|                                                                |"
-    echo "| [USAGE] : wasmtorch [comand]                                   |"
+    echo "|     A simple utility for managing wasmlite installs            |"
+    echo "|                                                                |"
+    echo "| [USAGE] : lite [comand]                                        |"
     echo "| [COMMAND] :                                                    |"
     echo "|  • help       - prints this help message                       |"
     echo "|  • install    - builds project and exposes relevant commands   |"
@@ -79,8 +81,8 @@ install() {
         add_link "wasmlite" $wasmlite_path
     fi
 
-    if [ ! -f "$usr_prefix/wasmtorch" ]; then
-        add_link "wasmtorch" $script_path
+    if [ ! -f "$usr_prefix/lite" ]; then
+        add_link "lite" $script_path
     fi
 }
 
@@ -99,7 +101,7 @@ uninstall() {
 
     displayln "Remove commands"
     remove_link "wasmlite"
-    remove_link "wasmtorch"
+    remove_link "lite"
 }
 
 # DESCRIPTION:
