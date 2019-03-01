@@ -1,7 +1,7 @@
 
 use std::marker::PhantomData;
 
-use crate::macros::rec_vararg_impl;
+use crate::macros::recurse_vararg_impl;
 
 use crate::types::Type;
 
@@ -18,8 +18,7 @@ impl<'a, Params> Func<'a, Params> {
 }
 
 ///
-rec_vararg_impl!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O);
-
+recurse_vararg_impl!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O);
 
 ///
 trait Type {}

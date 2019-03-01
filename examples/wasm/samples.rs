@@ -8,7 +8,7 @@ pub fn valid_module_with_preamble() -> Vec<u8> {
     ]
 }
 
-pub fn valid_module_with_type_section() -> Vec<u8> {
+pub fn valid_module_with_tysection() -> Vec<u8> {
     vec![
         0x00, 0x61, 0x73, 0x6d, // WASM_BINARY_MAGIC
         0x01, 0x00, 0x00, 0x00, // WASM_BINARY_VERSION

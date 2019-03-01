@@ -24,4 +24,4 @@ pub type MemoryPtr = *mut u8;
 pub type GlobalPtr = *mut u64;
 
 ///
-pub type FuncPtr = *const usize;
+pub type FuncPtr = *const ();

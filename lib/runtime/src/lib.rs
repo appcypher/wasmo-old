@@ -1,4 +1,4 @@
-mod macros;
+pub(crate) mod macros;
 mod module;
 mod instance;
 mod compilation;
@@ -9,7 +9,6 @@ mod pointers;
 mod imports;
 mod func;
 
-pub(crate) use macros;
 pub use module::Module;
 pub use instance::Instance;
 pub use descriptions::{TableDesc, MemoryDesc, GlobalDesc, FuncDesc};

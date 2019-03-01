@@ -2,7 +2,7 @@
 ;; valid_module_with_preamble
 (module)
 
-;; valid_module_with_type_section
+;; valid_module_with_tysection
 (module
   (type (func (param i32) (result i32)))
   (type (func (param i32 i64)))

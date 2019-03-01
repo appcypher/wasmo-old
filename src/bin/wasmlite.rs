@@ -5,11 +5,9 @@ use wasmlite_utils::verbose;
 fn main() {
     println!("\n=== [ wasmlite ] ===\n");
 
-    println!(" -------------------");
     println!("|                   |");
     println!("|    STAY TUNED!    |");
     println!("|                   |");
-    println!(" -------------------");
 
     // Get all arguments.
     let args: Vec<String> = env::args().collect();

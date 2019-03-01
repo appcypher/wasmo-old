@@ -66,7 +66,7 @@ pub struct Import {
 #[derive(Debug, Clone)]
 pub enum ImportDesc {
     Function {
-        type_index: u32,
+        tyindex: u32,
     },
     Table(Table),
     Memory(Memory),

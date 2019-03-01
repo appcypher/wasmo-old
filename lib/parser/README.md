@@ -299,7 +299,7 @@ end         | byte [0x0b]
         operator      | id   | immediates
         :-------------|:-----|:---------
         call     	  | 0x00 | varuint32  (function_index)
-        call_indirect | 0x01 | varuint32, varuint1 (type_index, reserved)
+        call_indirect | 0x01 | varuint32, varuint1 (tyindex, reserved)
 
     - PARAMETRIC
 

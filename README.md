@@ -125,7 +125,10 @@ let options = Some(InstanceOptions {
 });
 
 // JIT compile module in current process.
-let (module, instance) = wasmlite::instantiate(wasm_binary, imports, options);
+let module = compile(&wasm_binary, &options);
+
+// Instantiate module.
+let instance = module.instantiate(&imports);
 
 // Get the exported main function from instance.
 let main = instance.get_func("main");
@@ -180,9 +183,10 @@ main.call(5, wasm_array);
 ###
 
 ### ATTRIBUTIONS
-These are the nice projects `wasmlite` references for design
-- [inkwell](https://github.com/TheDan64/inkwell) [Apache-2.0] - the LLVM codegen section is inspired by this cool project
-- [wasmer](https://github.com/wasmerio/wasmer) [MIT] - design cues taken from this similar project
-- [wasmtime](https://github.com/CraneStation/wasmtime) [Apache-2.0] - design cues taken from this similar project
+These are the nice projects `wasmlite` references for its design
+- [inkwell](https://github.com/TheDan64/inkwell) [Apache-2.0] - the LLVM wrapper section is inspired by this awesome project that gives [llvm-sys](https://bitbucket.org/tari/llvm-sys.rs) a type-safe interface.
+- [wasmer](https://github.com/wasmerio/wasmer) [MIT] - wasmlite takes some architectural cues taken from wasmer, a WebAssembly runtime with cross-platform portability in mind.
+- [wasmtime](https://github.com/CraneStation/wasmtime) [Apache-2.0] - wasmlite also borrows some ideas from this wasmtime a Cranelift-based Webassembly runtime.
 
 If you are interested in this project, you should probably check out [WAVM](https://github.com/WAVM/WAVM) as well.
+In fact, you need to see [these other webassembly runtimes](https://github.com/appcypher/awesome-wasm-runtimes), they are all interesting projects.

@@ -1,4 +1,3 @@
-use std::str;
 use crate::{
     errors::ParserError,
     ir::{
@@ -9,6 +8,7 @@ use crate::{
     macros,
     validation::validate_section_exists,
 };
+use std::str;
 use wasmlite_utils::{debug, verbose};
 
 // TODO
@@ -204,7 +204,7 @@ impl<'a> Parser<'a> {
 
         Ok(match section_id {
             0x00 => self.custom_section()?,
-            0x01 => self.type_section()?,
+            0x01 => self.tysection()?,
             0x02 => self.import_section()?,
             0x03 => self.function_section()?,
             0x04 => self.table_section()?,
@@ -277,8 +277,8 @@ impl<'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn type_section(&mut self) -> ParserResult<Section> {
-        verbose!("-> type_section! <-");
+    pub fn tysection(&mut self) -> ParserResult<Section> {
+        verbose!("-> tysection! <-");
         let cursor = self.cursor;
         let mut func_types = vec![];
 
@@ -290,7 +290,7 @@ impl<'a> Parser<'a> {
             MalformedPayloadLengthInTypeSection
         );
 
-        verbose!("(type_section::payload_len = 0x{:x})", payload_len);
+        verbose!("(tysection::payload_len = 0x{:x})", payload_len);
 
         // Get the count of type entries.
         let entry_count = get_value!(
@@ -300,21 +300,21 @@ impl<'a> Parser<'a> {
             MalformedEntryCountInTypeSection
         );
 
-        verbose!("(type_section::entry_count = 0x{:x})", entry_count);
+        verbose!("(tysection::entry_count = 0x{:x})", entry_count);
 
         // Consume the type entries.
         for _ in 0..entry_count {
-            let type_id = get_value!(
+            let tyid = get_value!(
                 self.varint7(),
                 cursor,
                 EntriesDoNotMatchEntryCountInTypeSection,
                 MalformedTypeInTypeSection
             );
 
-            verbose!("(type_section::type_id = {:?})", type_id);
+            verbose!("(tysection::tyid = {:?})", tyid);
 
             // Type must be a func type.
-            let func_type = match type_id {
+            let func_type = match tyid {
                 -0x20 => self.func_type()?,
                 _ => {
                     return Err(ParserError {
@@ -371,7 +371,7 @@ impl<'a> Parser<'a> {
     pub fn function_section(&mut self) -> ParserResult<Section> {
         verbose!("-> function_section! <-");
         let cursor = self.cursor;
-        let mut type_indices = vec![];
+        let mut tyindices = vec![];
 
         // The length of the code section in bytes.
         let payload_len = get_value!(
@@ -398,19 +398,19 @@ impl<'a> Parser<'a> {
 
         // Consume the function index entries.
         for _ in 0..function_count {
-            let type_index = get_value!(
+            let tyindex = get_value!(
                 self.varuint32(),
                 cursor,
                 IncompleteFunctionSection,
                 MalformedEntryInFunctionSection
             );
 
-            type_indices.push(type_index);
+            tyindices.push(tyindex);
         }
-        verbose!("(function_section::type_indices = {:?})", type_indices);
+        verbose!("(function_section::tyindices = {:?})", tyindices);
 
         // TODO
-        Ok(Section::Function(type_indices))
+        Ok(Section::Function(tyindices))
     }
 
     /// TODO: TEST
@@ -785,16 +785,16 @@ impl<'a> Parser<'a> {
     pub fn function_import(&mut self) -> ParserResult<ImportDesc> {
         verbose!("-> function_import! <-");
         let cursor = self.cursor;
-        let type_index = get_value!(
+        let tyindex = get_value!(
             self.varuint32(),
             cursor,
             IncompleteFunctionImport,
             MalformedTypeIndexInFunctionImport
         );
 
-        verbose!("(function_import::type_index = {:?})", type_index);
+        verbose!("(function_import::tyindex = {:?})", tyindex);
 
-        Ok(ImportDesc::Function { type_index })
+        Ok(ImportDesc::Function { tyindex })
     }
 
     /// TODO: TEST

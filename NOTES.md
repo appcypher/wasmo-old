@@ -28,7 +28,7 @@ Experimenting! Random notes on speculative ideas.
     ```
 
 #### SELECTING ABI
-- Running a wasm file with the wasabi (llvm/musl) abi.
+- Running a wasm file with the wasabi (llvm/wasm32) abi.
 
     ```bash
     wasmlite server.wasm --abi=wasabi

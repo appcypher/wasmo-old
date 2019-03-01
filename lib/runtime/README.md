@@ -337,4 +337,132 @@ fun write_to_buf(str: *CChar, buf: U32, max: U32, var instance: Instance) -> CIn
 -------------------------------------------------------------------
 
 ## THREADS
+* ...
 
+-------------------------------------------------------------------
+
+<h1>REDESIGN<h1>
+
+
+### PROCESS
+COMPILE:
+
+    ORC Normal:
+        * Compiles to code with unresolved external symbols
+        * Populate InstanceData with local func addrs
+
+    ORC Lazy:
+        * Does nothing. Functions are called on first call
+
+    AOT/No Orc:
+        * Compiles to code with dynamic calls to external symbols
+        * Outputs to object file
+
+
+INSTANTIATION:
+
+    ORC Normal:
+        * Takes in imports
+        * Creates local memories, tables, globals
+        * Populate InstanceData with local tables, mems and globals addrs
+        * Populate InstanceData with imported func, tables, mems and globals addrs
+        * Relocate refs to external symbols
+        * Drop llvm module
+
+    ORC Lazy:
+        * Takes in imports
+        * Creates local memories, tables, globals
+        * Populate InstanceData with local tables, mems and globals addrs
+        * Populate InstanceData with imported func, tables, mems and globals addrs
+        * Apply external symbols address relocation (ORC's job)
+        * Drop llvm module
+
+RUNTIME:
+
+    ORC Normal:
+        * On function request through `get_func`, check signature match
+
+    ORC Lazy:
+        * Takes in wasm IR, generate llvm code and adds to llvm Module (Lazy REPL)
+        * Tell llvm world which function to compile. Phase is skipped if already compiled
+        * Gets addr to symbol
+        * Apply external symbols address relocation (ORC's job)
+        * Also on function request through `get_func`, check signature match
+
+
+### MODULE
+```rust
+struct Module {
+    data: InstanceData?, // Disposable
+    desc: ModuleDesc,
+    llvm_ir: llvm.Module?, // Diposable // DEP:aot_compile // DEP:runtime_lazy_compile
+}
+```
+
+```rust
+/// Filled at compilation and instantiation time
+struct InstanceData { // DEP:imported_funcs // DEP:local_funcs // DEP:instance.get_func
+    tables: *const TablePtr, // imports | locals
+    memories: *mut MemoryPtr, // imports | locals
+    globals: *mut GlobalPtr, // imports | locals // ptr to ptrs to global value
+    functions: *mut FuncPtr, // imports | locals
+}
+```
+
+```rust
+struct ModuleDesc { // DEP:generate_imports // DEP:instance.get_func
+    local: Locals,
+    imports: Imports,
+    exports: Exports,
+}
+```
+
+```rust
+struct Locals { // All sorted by declaration order
+    tables: Vec<TableDesc>,
+    memories: Vec<MemDesc>,
+    globals: Vec<GlobalDesc>,
+    functions: Vec<FuncDesc>,
+}
+```
+
+```rust
+struct TableDesc {
+    minimum: u32,
+    maximum: u32,
+    addr: Ptr, // ptr to InstanceData
+}
+```
+
+### IMPORTS
+```rust
+type Imports = Hashmap<String, Hashmap<String, Desc>>;  // DEP:generate_imports
+```
+
+```rust
+enum Desc {
+    TableDesc(TableDesc),
+    MemDesc(MemDesc),
+    GlobalDesc(GlobalDesc),
+    FuncDesc(FuncDesc),
+}
+```
+
+### EXPORTS
+```rust
+/// Filled at compilation and instantiation time
+/// ##### Implementation
+/// - TODO: Turn structure into a vector sorted by names and use bin search for lookup. Benchmark against current approaach.
+type Exports = Hashmap<String, Desc>; // DEP:instance.get_func
+```
+
+### EXAMPLE
+```rust
+let module = Module::compile(&wasm_code, &options);
+
+let instance = module.instantiate(imports);
+
+let main: Func<(i32, i32), i32> = instance.get_func("main");
+
+let result = main.call(1, 2);
+```

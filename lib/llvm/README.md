@@ -1,3 +1,4 @@
+
 #### TODO
 - [ ] Generate module information
 - [ ] Generate simple functions and operations for test
@@ -8,7 +9,41 @@
 - [ ] Proper planning of module/ir memory management
 - [ ] Trap and checks integration (checks types)
 - [ ] Proper planning of wasm memory model (page reservation and guard page)
+- [ ] Turn string conversion panics and asserts to CompilerError
 
+#### OWNERSHIP
+- Context
+    - can be shared by
+        - Module
+        - Builder
+        - BasicBlock
+
+- Module
+    - can be consumed by
+        - ExecutionEngine (?)
+
+- Builder
+    - not owned by anyone
+
+- BasicBlock
+    - can be shared by
+        - Builder
+
+- Execution Engine
+    - not owned by anyone
+
+- Types
+    - are consumed when used in other data structures.
+
+- Values
+    - are consumed when used in other data structures.
+
+#### Reason I'm not using Inkwell
+[Inkwell](https://github.com/TheDan64/inkwell) is a great project and the wrapper section of this project is largely based on it, but I decided wasmlite needs its own wrapper because wasmlite is in part meant to be a way of learning about LLVM and wasmlite's needs may differ from Inkwell's perspective. For example, Inkwell doesn't have a wrapper for the ORC C API yet. This is perhaps due to the API being currently outdated, but I'd like to start working on it as soon as possible.
+
+Wasmlite may still use Inkwell in the future if deemed appropriate.
+
+BTW, if you are just starting out with LLVM and you know some Rust, I encourage you to read Inkwell's source, there are interesting comments and notes left in it.
 
 -------------------------------------------------------------------
 

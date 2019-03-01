@@ -1,25 +1,26 @@
-
 use std::rc::Rc;
 
 use std::ffi::CString;
 
-use llvm_sys::core::{LLVMContextCreate, LLVMContextDispose, LLVMModuleCreateWithNameInContext, LLVMCreateBuilderInContext,
-LLVMInt32TypeInContext, LLVMInt64TypeInContext, LLVMFloatTypeInContext, LLVMDoubleTypeInContext};
+use llvm_sys::core::{
+    LLVMContextCreate, LLVMContextDispose, LLVMCreateBuilderInContext, LLVMDoubleTypeInContext,
+    LLVMFloatTypeInContext, LLVMInt32TypeInContext, LLVMInt64TypeInContext,
+    LLVMModuleCreateWithNameInContext,
+};
 
 use llvm_sys::prelude::{LLVMContextRef, LLVMTypeRef};
 
 use wasmlite_utils::debug;
 
 use crate::{
-    Module,
-    Builder,
-    types::{I32Type, I64Type, F32Type, F64Type},
+    types::{FloatType, IntType},
+    Builder, Module,
 };
 
 ///
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Context {
-    context: Rc<LLVMContextRef>,
+    pub(crate) context: Rc<LLVMContextRef>,
 }
 
 ///
@@ -32,10 +33,6 @@ impl Context {
         Self {
             context: Rc::new(context),
         }
-    }
-
-    pub(crate) fn as_ptr(&self) -> LLVMContextRef {
-        *self.context
     }
 
     pub fn create_module(&self, name: &str) -> Module {
@@ -52,42 +49,46 @@ impl Context {
         Builder::new(builder, Some(self))
     }
 
-    pub fn i32_type(&self) -> I32Type {
-        let type_ = unsafe { LLVMInt32TypeInContext(*self.context) };
+    pub fn i32_type(&self) -> IntType {
+        let ty = unsafe { LLVMInt32TypeInContext(*self.context) };
 
-        I32Type::new(type_)
+        IntType::new(ty)
     }
 
-    pub fn i64_type(&self) -> I64Type {
-        let type_ = unsafe { LLVMInt64TypeInContext(*self.context) };
+    pub fn i64_type(&self) -> IntType {
+        let ty = unsafe { LLVMInt64TypeInContext(*self.context) };
 
-        I64Type::new(type_)
+        IntType::new(ty)
     }
 
-    pub fn f32_type(&self) -> F32Type {
-        let type_ = unsafe { LLVMFloatTypeInContext(*self.context) };
+    pub fn f32_type(&self) -> FloatType {
+        let ty = unsafe { LLVMFloatTypeInContext(*self.context) };
 
-        F32Type::new(type_)
+        FloatType::new(ty)
     }
 
-    pub fn f64_type(&self) -> F64Type {
-        let type_ = unsafe { LLVMDoubleTypeInContext(*self.context) };
+    pub fn f64_type(&self) -> FloatType {
+        let ty = unsafe { LLVMDoubleTypeInContext(*self.context) };
 
-        F64Type::new(type_)
+        FloatType::new(ty)
+    }
+
+    pub fn rc(&self) -> usize {
+        Rc::strong_count(&(self.context))
     }
 }
 
 ///
 impl Drop for Context {
     fn drop(&mut self) {
-        debug!(
-            "Context drop attempt @ ref count = {:?}",
-            Rc::strong_count(&self.context)
-        );
         if Rc::strong_count(&self.context) == 1 {
             unsafe {
                 LLVMContextDispose(*self.context);
             }
         }
+        debug!(
+            "Context drop! to rc({:?})",
+            Rc::strong_count(&self.context) - 1
+        );
     }
 }
