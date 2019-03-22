@@ -27,7 +27,7 @@ TYPES
 ==================================
 
 ### TYPES [varint7]
-type     | hex   | leb
+type     | hex   | value
 :--------|:------|:----
 i32      | 0x7f  | -0x01
 i64      | 0x7e  | -0x02

@@ -2,7 +2,7 @@ use crate::{
     errors::ParserError,
     ir::{
         self, Data, Element, Export, ExportDesc, Function, Global, Import, ImportDesc, Local,
-        Memory, Module, Operator, Section, Table, Type, ValueType::*,
+        Memory, Module, Operator, Section, Table, Type, ValueType::*, FuncSignature, ValueType,
     },
     kinds::{ErrorKind, SectionKind},
     stack::Stack,
@@ -10,6 +10,7 @@ use crate::{
 use std::collections::LinkedList;
 use std::str;
 use wasmlite_utils::{debug, verbose};
+use hashbrown::HashMap;
 
 // TODO
 //  - Improve error reporting.
@@ -137,10 +138,10 @@ impl<'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn sections(&mut self) -> ParserResult<Vec<Section>> {
+    pub fn sections(&mut self) -> ParserResult<HashMap<u8, Section>> {
         verbose!("-> module_sections! <-");
 
-        let mut sections = vec![];
+        let mut sections = HashMap::new();
 
         // Iterate and Consume the section
         loop {
@@ -175,14 +176,13 @@ impl<'a> Parser<'a> {
             );
 
             // Consume appropriate section based on section id.
-            sections.push(self.section(section_id)?);
+            sections.insert(section_id, self.section(section_id, &sections)?);
         }
 
         Ok(sections)
     }
 
     /// Gets the next section id and payload.
-    /// Needed by reader
     pub fn section_id(&mut self) -> ParserResult<u8> {
         verbose!("-> module_section_id! <-");
         let cursor = self.cursor;
@@ -202,13 +202,13 @@ impl<'a> Parser<'a> {
     }
 
     /// Gets the next module section
-    pub fn section(&mut self, section_id: u8) -> ParserResult<Section> {
+    pub fn section(&mut self, section_id: u8, sections: &HashMap<u8, Section>) -> ParserResult<Section> {
         verbose!("-> section! <-");
         let cursor = self.cursor;
 
         Ok(match section_id {
             0x00 => self.custom_section()?,
-            0x01 => self.tysection()?,
+            0x01 => self.type_section()?,
             0x02 => self.import_section()?,
             0x03 => self.function_section()?,
             0x04 => self.table_section()?,
@@ -217,7 +217,8 @@ impl<'a> Parser<'a> {
             0x07 => self.export_section()?,
             0x08 => self.start_section()?,
             0x09 => self.element_section()?,
-            0x0A => self.code_section()?,
+            // Code section needs `sections` to validate function calls and function return signature
+            0x0A => self.code_section(sections)?,
             0x0B => self.data_section()?,
             _ => {
                 return Err(ParserError {
@@ -281,8 +282,8 @@ impl<'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn tysection(&mut self) -> ParserResult<Section> {
-        verbose!("-> tysection! <-");
+    pub fn type_section(&mut self) -> ParserResult<Section> {
+        verbose!("-> type_section! <-");
         let cursor = self.cursor;
         let mut func_types = vec![];
 
@@ -294,7 +295,7 @@ impl<'a> Parser<'a> {
             MalformedPayloadLengthInTypeSection
         );
 
-        verbose!("(tysection::payload_len = 0x{:x})", payload_len);
+        verbose!("(type_section::payload_len = 0x{:x})", payload_len);
 
         // Get the count of type entries.
         let entry_count = get_value!(
@@ -304,7 +305,7 @@ impl<'a> Parser<'a> {
             MalformedEntryCountInTypeSection
         );
 
-        verbose!("(tysection::entry_count = 0x{:x})", entry_count);
+        verbose!("(type_section::entry_count = 0x{:x})", entry_count);
 
         // Consume the type entries.
         for _ in 0..entry_count {
@@ -315,7 +316,7 @@ impl<'a> Parser<'a> {
                 MalformedTypeInTypeSection
             );
 
-            verbose!("(tysection::tyid = {:?})", tyid);
+            verbose!("(type_section::tyid = {:?})", tyid);
 
             // Type must be a func type.
             let func_type = match tyid {
@@ -375,7 +376,7 @@ impl<'a> Parser<'a> {
     pub fn function_section(&mut self) -> ParserResult<Section> {
         verbose!("-> function_section! <-");
         let cursor = self.cursor;
-        let mut tyindices = vec![];
+        let mut type_indices = vec![];
 
         // The length of the code section in bytes.
         let payload_len = get_value!(
@@ -402,19 +403,21 @@ impl<'a> Parser<'a> {
 
         // Consume the function index entries.
         for _ in 0..function_count {
-            let tyindex = get_value!(
+            // TODO: Validate type exists
+            let type_index = get_value!(
                 self.varuint32(),
                 cursor,
                 IncompleteFunctionSection,
                 MalformedEntryInFunctionSection
             );
 
-            tyindices.push(tyindex);
+            type_indices.push(type_index);
         }
-        verbose!("(function_section::tyindices = {:?})", tyindices);
+
+        verbose!("(function_section::type_indices = {:?})", type_indices);
 
         // TODO
-        Ok(Section::Function(tyindices))
+        Ok(Section::Function(type_indices))
     }
 
     /// TODO: TEST
@@ -624,9 +627,10 @@ impl<'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn code_section(&mut self) -> ParserResult<Section> {
+    pub fn code_section(&mut self, sections: &HashMap<u8, Section>) -> ParserResult<Section> {
         verbose!("-> code_section! <-");
         let cursor = self.cursor;
+
         let mut function_bodies = vec![];
 
         // The length of the code section in bytes.
@@ -650,9 +654,14 @@ impl<'a> Parser<'a> {
         verbose!("(code_section::entry_count = 0x{:x})", body_count);
 
         // Consume the function bodies.
-        for _ in 0..body_count {
-            function_bodies.push(self.function_body()?);
+        for (index, _) in (0..body_count).enumerate() {
+            // TODO: Validate function exists
+
+            let signature = ir::get_type_by_code_index(index, sections);
+
+            function_bodies.push(self.function_body(&signature)?);
         }
+
         verbose!("(code_section::function_bodies = {:?})", function_bodies);
 
         // TODO
@@ -789,16 +798,16 @@ impl<'a> Parser<'a> {
     pub fn function_import(&mut self) -> ParserResult<ImportDesc> {
         verbose!("-> function_import! <-");
         let cursor = self.cursor;
-        let tyindex = get_value!(
+        let type_index = get_value!(
             self.varuint32(),
             cursor,
             IncompleteFunctionImport,
             MalformedTypeIndexInFunctionImport
         );
 
-        verbose!("(function_import::tyindex = {:?})", tyindex);
+        verbose!("(function_import::type_index = {:?})", type_index);
 
-        Ok(ImportDesc::Function { tyindex })
+        Ok(ImportDesc::Function { type_index })
     }
 
     /// TODO: TEST
@@ -1148,7 +1157,7 @@ impl<'a> Parser<'a> {
 
     /// TODO: TEST
     /// Each function body corresponds to the functions declared in the function section.
-    pub fn function_body(&mut self) -> ParserResult<Function> {
+    pub fn function_body(&mut self, signature: &FuncSignature) -> ParserResult<Function> {
         verbose!("-> function_body! <-");
         let cursor = self.cursor;
         let mut locals = vec![];
@@ -1194,6 +1203,12 @@ impl<'a> Parser<'a> {
                 cursor,
             });
         }
+
+        //
+        debug!("sig = {:?}, stack = {:?}", signature, self.stack);
+
+        // Check if return signature matches stack type
+        self.validate_function_return_signature(signature.clone())?;
 
         // Reset stack and operator_index
         self.stack = Stack::new();
@@ -1586,7 +1601,7 @@ impl<'a> Parser<'a> {
 
         // Get param types.
         for _ in 0..param_count {
-            let param_type = Type::from(get_value!(
+            let param_type = ValueType::from(get_value!(
                 self.value_type(),
                 cursor,
                 IncompleteFunctionType,
@@ -1609,7 +1624,7 @@ impl<'a> Parser<'a> {
 
         // Get return types.
         for _ in 0..return_count {
-            let return_type = Type::from(get_value!(
+            let return_type = ValueType::from(get_value!(
                 self.value_type(),
                 cursor,
                 IncompleteFunctionType,
@@ -1620,7 +1635,7 @@ impl<'a> Parser<'a> {
         }
         verbose!("(func_type::return_types = {:?})", returns);
 
-        Ok(Type::Func { params, returns })
+        Ok(Type::Func(FuncSignature { params, returns }))
     }
 
     /// TODO: TEST

@@ -82,6 +82,11 @@ impl Stack {
         self.pointer
     }
 
+    pub fn types(&self) -> Vec<ValueType> {
+        let stack_types = &self.stack[..self.pointer];
+        stack_types.iter().map(|x| x.clone().into()).collect()
+    }
+
     ///
     pub fn check_types(&self, types: &[ValueType]) -> bool {
         let types_len = types.len();

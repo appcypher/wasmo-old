@@ -232,12 +232,19 @@ pub enum ErrorKind {
     //------------ OPERATORS --------//
 
     UnsupportedOperator,
-
+    // Types
     MismatchedOperandTypes {
         expected: Vec<ir::ValueType>,
         found: Vec<ir::ValueType>,
     },
-
+    MismatchedFunctionSignature {
+        expected: ir::FuncSignature,
+        found: Vec<ir::ValueType>,
+    },
+    MismatchedFunctionReturnSignature {
+        expected: ir::FuncSignature,
+        return_type_found: Vec<ir::ValueType>,
+    },
     // Memory
     IncompleteMemoryOperator,
     MalformedAlignmentInMemoryOperator,

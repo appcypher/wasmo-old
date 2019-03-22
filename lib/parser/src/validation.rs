@@ -2,7 +2,8 @@ use crate::{
     errors::ParserError,
     kinds::ErrorKind,
     parser::{Parser, ParserResult},
-    ValueType::{self, *}
+    ValueType::{self, *},
+    ir::FuncSignature,
 };
 
 // TODO: MAKE THESE VALIDATIONS AN IMPL OF
@@ -110,9 +111,7 @@ impl<'a> Parser<'a> {
         let cursor = self.cursor;
 
         if !self.stack.check_types(expected_types) {
-            let stack_pointer = self.stack.pointer;
-            let stack_types = &self.stack.stack[..stack_pointer];
-            let stack_types: Vec<ValueType> = stack_types.iter().map(|x| x.clone().into()).collect();
+            let stack_types = self.stack.types();
 
             return Err(ParserError {
                 cursor,
@@ -124,7 +123,26 @@ impl<'a> Parser<'a> {
         }
         Ok(())
     }
+
+    ///
+    pub fn validate_function_return_signature(&self, expected_signature: FuncSignature) -> ParserResult<()> {
+        let cursor = self.cursor;
+
+        if !self.stack.check_types(&expected_signature.returns) {
+            let stack_types = self.stack.types();
+
+            return Err(ParserError {
+                cursor,
+                kind: ErrorKind::MismatchedFunctionReturnSignature {
+                    expected: expected_signature,
+                    return_type_found: stack_types,
+                }
+            });
+        }
+        Ok(())
+    }
 }
+
 
 
 

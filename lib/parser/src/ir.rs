@@ -1,3 +1,30 @@
+use hashbrown::HashMap;
+
+// TODO: Improve code
+pub fn get_type_by_code_index<'a>(code_index: usize, sections: &HashMap<u8, Section>) -> FuncSignature {
+    // Get the functions
+    match sections.get(&0x03).unwrap() {
+        Section::Function(functions) => {
+            // Get the function
+            let function = functions[code_index];
+            // Get the types
+            match sections.get(&0x01).unwrap() {
+                Section::Type(types) => {
+                    // Get the signature
+                    match &types[function as usize] {
+                        Type::Func(sig) => sig.clone(),
+                        _ => unreachable!(),
+                    }
+                },
+                _ => unreachable!(),
+            }
+        },
+        _ => unreachable!(),
+    }
+}
+
+
+
 ///
 #[derive(Debug, Clone)]
 pub enum Type {
@@ -6,11 +33,14 @@ pub enum Type {
     F32,
     F64,
     FuncRef,
-    Func {
-        params: Vec<Type>,
-        returns: Vec<Type>,
-    },
+    Func(FuncSignature),
     Empty,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FuncSignature {
+    pub params: Vec<ValueType>,
+    pub returns: Vec<ValueType>,
 }
 
 impl From<i8> for Type {
@@ -21,10 +51,10 @@ impl From<i8> for Type {
             -0x03 => Type::F32,
             -0x04 => Type::F64,
             -0x10 => Type::FuncRef,
-            -0x20 => Type::Func {
+            -0x20 => Type::Func(FuncSignature {
                 params: vec![],
                 returns: vec![],
-            },
+            }),
             -0x40 => Type::Empty,
             _ => unreachable!(),
         }
@@ -40,10 +70,22 @@ pub enum ValueType {
     F64,
 }
 
+impl From<i8> for ValueType {
+    fn from(value: i8) -> Self {
+        match value {
+            -0x01 => ValueType::I32,
+            -0x02 => ValueType::I64,
+            -0x03 => ValueType::F32,
+            -0x04 => ValueType::F64,
+            _ => unreachable!(),
+        }
+    }
+}
+
 ///
 #[derive(Debug, Clone)]
 pub struct Module {
-    pub sections: Vec<Section>,
+    pub sections: HashMap<u8, Section>,
 }
 
 ///
@@ -75,7 +117,7 @@ pub struct Import {
 #[derive(Debug, Clone)]
 pub enum ImportDesc {
     Function {
-        tyindex: u32,
+        type_index: u32,
     },
     Table(Table),
     Memory(Memory),
@@ -162,14 +204,14 @@ pub enum Operator {
     Unreachable,
 
     // CONSTANT
-
+    // (value: Imm)
     I32Const(i32),
     I64Const(i64),
     F32Const(f32),
     F64Const(f64),
 
     // MEMORY
-
+    // (align: Imm, offset: Imm, base: I32) -> T
     I32Load(u32, u32, usize),
     I64Load(u32, u32, usize),
     F32Load(u32, u32, usize),
@@ -190,6 +232,7 @@ pub enum Operator {
     I64Load32Signed(u32, u32, usize),
     I64Load32Unsigned(u32, u32, usize),
 
+    // (align: Imm, offset: Imm, base: I32, value: T)
     I32Store(u32, u32, usize, usize),
     I64Store(u32, u32, usize, usize),
     F32Store(u32, u32, usize, usize),
@@ -203,11 +246,14 @@ pub enum Operator {
 
     I64Store32(u32, u32, usize, usize),
 
+    // (delta: I32) -> I32
     MemoryGrow(usize),
+
+    // () -> I32
     MemorySize,
 
     // NUMERIC
-
+    // (value: T) -> T
     I32Clz(usize),
     I64Clz(usize),
 
@@ -217,6 +263,7 @@ pub enum Operator {
     I32Popcnt(usize),
     I64Popcnt(usize),
 
+    // (lhs: T, rhs: T) -> T
     I32And(usize, usize),
     I64And(usize, usize),
 
@@ -303,10 +350,11 @@ pub enum Operator {
     F64Sqrt(usize),
 
     // COMPARISONS
-
+    // (value: T) -> I32
     I32Eqz(usize),
     I64Eqz(usize),
 
+    // (lhs: T, rhs: T) -> I32
     I32Eq(usize, usize),
     I64Eq(usize, usize),
     F32Eq(usize, usize),
@@ -354,9 +402,33 @@ pub enum Operator {
     F64Ge(usize, usize),
 
     // REINTERPRETATIONS
-
+    // (value: T) -> U
     I32ReinterpretF32(usize),
     I64ReinterpretF64(usize),
     F32ReinterpretI32(usize),
     F64ReinterpretI64(usize),
 }
+
+
+
+        // i32.wrap_i64        | 0xa7  |
+        // i32.trunc_f32_s     | 0xa8  |
+        // i32.trunc_f32_u     | 0xa9  |
+        // i32.trunc_f64_s     | 0xaa  |
+        // i32.trunc_f64_u     | 0xab  |
+        // i64.extend_i32_s    | 0xac  |
+        // i64.extend_i32_u    | 0xad  |
+        // i64.trunc_f32_s     | 0xae  |
+        // i64.trunc_f32_u     | 0xaf  |
+        // i64.trunc_f64_s     | 0xb0  |
+        // i64.trunc_f64_u     | 0xb1  |
+        // f32.convert_i32_s   | 0xb2  |
+        // f32.convert_i32_u   | 0xb3  |
+        // f32.convert_i64_s   | 0xb4  |
+        // f32.convert_i64_u   | 0xb5  |
+        // f32.demote_f64      | 0xb6  |
+        // f64.convert_i32_s   | 0xb7  |
+        // f64.convert_i32_u   | 0xb8  |
+        // f64.convert_i64_s   | 0xb9  |
+        // f64.convert_i64_u   | 0xba  |
+        // f64.promote_f32     | 0xbb  |

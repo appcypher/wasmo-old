@@ -15,6 +15,7 @@ homepage = "https://github.com/appcypher/wasmlite"
 
 [dependencies]
 wasmlite-utils = { path = "../utils" }
+hashbrown = "0.1.8"
 
 [features]
 debug = []
