@@ -2,101 +2,131 @@ use crate::{
     errors::ParserError,
     kinds::ErrorKind,
     parser::{Parser, ParserResult},
+    ValueType::{self, *}
 };
 
-/// Implementation based on Unicode Standard 11.0, Section 3.9, Table 3-7.
-// TODO: TEST THOROUGHLY!! (Codepoints, Grapheme Clusters, etc.)
-pub fn validate_utf8(bytes: &[u8]) -> bool {
-    let length = bytes.len();
-    let mut cursor = 0;
+// TODO: MAKE THESE VALIDATIONS AN IMPL OF
 
-    // There must be at least a byte for a valid utf-8 string
-    if length == 0 {
-        return false;
-    }
+impl<'a> Parser<'a> {
+    /// Implementation based on Unicode Standard 11.0, Section 3.9, Table 3-7.
+    // TODO: TEST THOROUGHLY!! (Codepoints, Grapheme Clusters, etc.)
+    pub fn validate_utf8(&self, bytes: &[u8]) -> bool {
+        let cursor = self.cursor;
 
-    //
-    while cursor < length {
+        let length = bytes.len();
+        let mut cursor = 0;
+
+        // There must be at least a byte for a valid utf-8 string
+        if length == 0 {
+            return false;
+        }
+
         //
-        if bytes[cursor] < 0x80 {
-            // 1-byte encoding
-            cursor += 1;
-        } else if
-        // 2-byte encoding
-        // Check if there is at least 2 bytes needed by following conditions.
-        cursor < length - 2 &&
+        while cursor < length {
+            //
+            if bytes[cursor] < 0x80 {
+                // 1-byte encoding
+                cursor += 1;
+            } else if
+            // 2-byte encoding
+            // Check if there is at least 2 bytes needed by following conditions.
+            cursor < length - 2 &&
             (bytes[cursor] >= 0xC2 && bytes[cursor] <= 0xDF) && // byte_1
             (bytes[cursor + 1] >= 0x80 && bytes[cursor + 1] <= 0xBF)
-        {
-            // byte_2
-            cursor += 2;
-        } else if
-        // 3-byte encoding
-        // Check if there is at least 3 bytes needed by following conditions.
-        cursor < length - 3
-            && (
-                (bytes[cursor] == 0xE0) && // byte_1
+            {
+                // byte_2
+                cursor += 2;
+            } else if
+            // 3-byte encoding
+            // Check if there is at least 3 bytes needed by following conditions.
+            cursor < length - 3
+                && (
+                    (bytes[cursor] == 0xE0) && // byte_1
                 (bytes[cursor + 1] >= 0xA0 && bytes[cursor + 1] <= 0xBF) && // byte_2
                 (bytes[cursor + 2] >= 0x80 && bytes[cursor + 3] <= 0xBF)
-                // byte_3
-            )
-            || (
-                ((bytes[cursor] >= 0xE1 && bytes[cursor] <= 0xEC) || (bytes[cursor] >= 0xEE && bytes[cursor] <= 0xEF)) && // byte_1
+                    // byte_3
+                )
+                || (
+                    ((bytes[cursor] >= 0xE1 && bytes[cursor] <= 0xEC) || (bytes[cursor] >= 0xEE && bytes[cursor] <= 0xEF)) && // byte_1
                 (bytes[cursor + 1] >= 0x80 && bytes[cursor + 1] <= 0xBF) && // byte_2
                 (bytes[cursor + 2] >= 0x80 && bytes[cursor + 3] <= 0xBF)
-                // byte_3
-            )
-            || (
-                (bytes[cursor] == 0xED) && // byte_1
+                    // byte_3
+                )
+                || (
+                    (bytes[cursor] == 0xED) && // byte_1
                 (bytes[cursor + 1] >= 0x80 && bytes[cursor + 1] <= 0x9F) && // byte_2
                 (bytes[cursor + 2] >= 0x80 && bytes[cursor + 3] <= 0xBF)
-                // byte_3
-            )
-        {
-            cursor += 3;
-        } else if
-        // 4-byte encoding
-        // Check if there is at least 4 bytes needed by following conditions.
-        cursor < length - 4
-            && (
-                (bytes[cursor] == 0xF0) && // byte_1
+                    // byte_3
+                )
+            {
+                cursor += 3;
+            } else if
+            // 4-byte encoding
+            // Check if there is at least 4 bytes needed by following conditions.
+            cursor < length - 4
+                && (
+                    (bytes[cursor] == 0xF0) && // byte_1
                 (bytes[cursor + 1] >= 0x80 && bytes[cursor + 1] <= 0xBF) && // byte_2
                 (bytes[cursor + 2] >= 0x7F && bytes[cursor + 2] <= 0xBF) && // byte_3
                 (bytes[cursor + 3] >= 0x7F && bytes[cursor + 3] <= 0xBF)
-                // byte_4
-            )
-            || (
-                ((bytes[cursor] >= 0xF1 && bytes[cursor] <= 0xF3) || (bytes[cursor] == 0xF4)) && // byte_1
+                    // byte_4
+                )
+                || (
+                    ((bytes[cursor] >= 0xF1 && bytes[cursor] <= 0xF3) || (bytes[cursor] == 0xF4)) && // byte_1
                 (bytes[cursor + 1] >= 0x80 && bytes[cursor + 1] <= 0xBF) && // byte_2
                 (bytes[cursor + 2] >= 0x80 && bytes[cursor + 2] <= 0xBF) && // byte_3
                 (bytes[cursor + 3] >= 0x80 && bytes[cursor + 3] <= 0xBF)
-                // byte_4
-            )
-        {
-            cursor += 4;
-        } else {
-            return false;
+                    // byte_4
+                )
+            {
+                cursor += 4;
+            } else {
+                return false;
+            }
         }
-    }
-    true
-}
-
-/// Validate that section hasn't already been defined.
-pub fn validate_section_exists(
-    parser: &mut Parser,
-    section_id: u8,
-    cursor: usize,
-) -> ParserResult<()> {
-    // Check if section has already been consumed.
-    if parser.sections_consumed.contains(&section_id) {
-        return Err(ParserError {
-            kind: ErrorKind::SectionAlreadyDefined,
-            cursor,
-        });
+        true
     }
 
-    // Save section_id in parser's consumed section.
-    parser.push_section_id(&section_id);
+    /// Validates that a particular section hasn't already been defined.
+    pub fn validate_section_exists(&mut self, section_id: u8) -> ParserResult<()> {
+        let cursor = self.cursor;
 
-    Ok(())
+        // Check if section has already been consumed.
+        if self.sections_consumed.contains(&section_id) {
+            return Err(ParserError {
+                kind: ErrorKind::SectionAlreadyDefined,
+                cursor,
+            });
+        }
+
+        // Save section_id in parser's consumed section.
+        self.push_section_id(&section_id);
+
+        Ok(())
+    }
+
+    ///
+    pub fn validate_signature_match(&self, expected_types: &[ValueType]) -> ParserResult<()> {
+        let cursor = self.cursor;
+
+        if !self.stack.check_types(expected_types) {
+            let stack_pointer = self.stack.pointer;
+            let stack_types = &self.stack.stack[..stack_pointer];
+            let stack_types: Vec<ValueType> = stack_types.iter().map(|x| x.clone().into()).collect();
+
+            return Err(ParserError {
+                cursor,
+                kind: ErrorKind::MismatchedOperandTypes {
+                    expected: expected_types.to_vec(),
+                    found: stack_types,
+                }
+            });
+        }
+        Ok(())
+    }
 }
+
+
+
+// LIST
+// mem operations Alignment= power df two, not more than 4

@@ -19,7 +19,7 @@ MODULE —— IMPORTS
         |
         | instantiation (memory alloc & relocation)
         |
-    INSTANCE
+    MODULE
 ```
 
 ## SYSTEM

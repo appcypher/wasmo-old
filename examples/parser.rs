@@ -1,11 +1,19 @@
-mod wasm;
-use wasm::samples;
-use wasmlite_parser::parser::Parser;
+mod utils;
+
+use utils::project_path;
+use wasmlite_parser::Parser;
+use wasmlite_utils::{debug, file::wat2wasm, verbose};
 
 fn main() {
-    // Parser::new(&samples::valid_module_with_nop_in_function_body()).module().unwrap();
-    // Parser::new(&samples::valid_module_with_table_section_and_maximum()).module().unwrap();
-    // Parser::new(&samples::valid_module_with_table_section_no_maximum()).module().unwrap();
-    // Parser::new(&samples::valid_module_with_memory_section_and_maximum()).module().unwrap();
-    Parser::new(&samples::valid_module_with_memory_section_no_maximum()).module().unwrap();
+    // Convert wat file to wasm bytes.
+    // let wasm_bytes = wat2wasm(project_path("examples/wat/valid_export_section.wat").as_str());
+    let wasm_bytes = wat2wasm(project_path("examples/wat/valid_add_operations.wat").as_str());
+
+    // Parse wasm bytes
+    let wasm_module = Parser::new(&wasm_bytes).module();
+
+    match wasm_module {
+        Ok(module) => verbose!("wasm_module = {:#?}", module),
+        Err(error) => debug!("ERROR!\n\n{:#?}", error),
+    }
 }

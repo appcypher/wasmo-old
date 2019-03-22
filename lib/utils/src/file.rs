@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::io::prelude::Read;
+use wabt;
 
 /// Gets the bytes of a file as a vector of u8s.
 pub fn read_file_bytes(filename: &str) -> Vec<u8> {
@@ -26,4 +27,13 @@ pub fn is_wasm_file(filename: &str) -> bool {
 
     // Check if the file starts with bytes "\0asm"
     bytes.starts_with(b"\0asm")
+}
+
+pub fn wat2wasm(filepath: &str) -> Vec<u8> {
+    let mut file = File::open(filepath).expect("Unable to open the file");
+    let mut contents = String::new();
+    file.read_to_string(&mut contents)
+        .expect("Unable to read the file");
+
+    wabt::wat2wasm(contents).unwrap()
 }

@@ -1,3 +1,5 @@
+//! USAGE: cargo run --example jit --features "verbose"
+
 use wasmlite_utils::debug;
 
 use wasmlite_parser::ir;

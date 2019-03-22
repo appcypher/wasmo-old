@@ -1,4 +1,12 @@
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
+pub enum ValueType {
+    I32,
+    I64,
+    F32,
+    F64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum SectionKind {
     Type,
     Import,
@@ -31,6 +39,8 @@ impl From<u8> for SectionKind {
         }
     }
 }
+
+use crate::ir;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ErrorKind {
@@ -218,4 +228,18 @@ pub enum ErrorKind {
     InvalidValueType,
     // ExternalKind
     InvalidImportType,
+
+    //------------ OPERATORS --------//
+
+    UnsupportedOperator,
+
+    MismatchedOperandTypes {
+        expected: Vec<ir::ValueType>,
+        found: Vec<ir::ValueType>,
+    },
+
+    // Memory
+    IncompleteMemoryOperator,
+    MalformedAlignmentInMemoryOperator,
+    MalformedOffsetInMemoryOperator,
 }

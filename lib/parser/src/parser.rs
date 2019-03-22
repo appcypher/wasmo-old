@@ -1,13 +1,13 @@
 use crate::{
     errors::ParserError,
     ir::{
-        Data, Element, Export, ExportDesc, Function, Global, Import, ImportDesc, Local, Memory,
-        Operator, Section, Table, Type,
+        self, Data, Element, Export, ExportDesc, Function, Global, Import, ImportDesc, Local,
+        Memory, Module, Operator, Section, Table, Type, ValueType::*,
     },
     kinds::{ErrorKind, SectionKind},
-    macros,
-    validation::validate_section_exists,
+    stack::Stack,
 };
+use std::collections::LinkedList;
 use std::str;
 use wasmlite_utils::{debug, verbose};
 
@@ -22,9 +22,11 @@ pub type ParserResult<T> = Result<T, ParserError>;
 /// - Just like with body_size in function body. payload_len should be used to determine if section content stay within payload range
 #[derive(Debug, Clone)]
 pub struct Parser<'a> {
-    code: &'a [u8],                        // The wasm binary to parse
-    cursor: usize, // Used to track the current byte position as the parser advances.
-    pub(super) sections_consumed: Vec<u8>, // Holds the section ids that have been consumed. Section types cannot occur more than once.
+    pub(crate) code: &'a [u8],             // The wasm binary to parse
+    pub(crate) cursor: usize, // Used to track the current byte position as the parser advances.
+    pub(crate) sections_consumed: Vec<u8>, // Holds the section ids that have been consumed. Section types cannot occur more than once.
+    pub(crate) stack: Stack,
+    pub(crate) operator_index: usize,
 }
 
 /// Contains the implementation of parser
@@ -35,6 +37,8 @@ impl<'a> Parser<'a> {
             code,
             cursor: 0, // cursor starts at first byte
             sections_consumed: vec![],
+            stack: Stack::new(),
+            operator_index: 0,
         }
     }
 
@@ -49,19 +53,19 @@ impl<'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    /// Generates an IR rpresenting a parsed wasm module.
-    pub fn module(&mut self) -> ParserResult<()> {
+    /// Generates an IR representing a parsed wasm module.
+    pub fn module(&mut self) -> ParserResult<Module> {
         verbose!("-> module! <-");
 
         // Consume preamble.
         self.module_preamble()?;
 
         // TODO: Module can stop here.
-        let sections = self.sections().unwrap();
+        let sections = self.sections()?;
 
-        debug!("(module::sections = {:#?})", sections);
+        verbose!("(module::sections = {:#?})", sections);
 
-        Ok(())
+        Ok(Module { sections })
     }
 
     /// TODO: TEST
@@ -158,7 +162,7 @@ impl<'a> Parser<'a> {
             };
 
             // Validate that section id exists
-            validate_section_exists(self, section_id, cursor)?;
+            self.validate_section_exists(section_id)?;
 
             // Save id in list of sections consumed if not custpom section
             if section_id != 0 {
@@ -192,7 +196,7 @@ impl<'a> Parser<'a> {
         );
 
         // Validate that section id exists.
-        validate_section_exists(self, section_id, cursor)?;
+        self.validate_section_exists(section_id)?;
 
         Ok(section_id)
     }
@@ -1191,6 +1195,10 @@ impl<'a> Parser<'a> {
             });
         }
 
+        // Reset stack and operator_index
+        self.stack = Stack::new();
+        self.operator_index = 0;
+
         Ok(Function {
             locals,
             instructions,
@@ -1228,10 +1236,12 @@ impl<'a> Parser<'a> {
     /// TODO: TEST
     pub fn instructions(&mut self) -> ParserResult<Vec<Operator>> {
         verbose!("-> instructions! <-");
+
         let cursor = self.cursor;
         let mut operators = vec![];
 
         loop {
+            //
             let opcode = get_value!(
                 self.uint8(),
                 cursor,
@@ -1242,28 +1252,41 @@ impl<'a> Parser<'a> {
             verbose!("(instructions::opcode = 0x{:x})", opcode);
 
             // If opcode is an end byte. Break!
+            // We can break because this end byte will always be function end byte
+            // Each operator parser consumes its corresponding end byte
             if opcode == 0x0b {
                 break;
             }
 
             operators.push(self.operator(opcode)?);
+
+            debug!("Stack = {:?}\n", self.stack);
+
+            // Increment operator_index
+            self.operator_index += 1;
         }
+
+        debug!("Operators = {:?}\n", operators);
 
         Ok(operators)
     }
 
     /// TODO: TEST
     pub fn operator(&mut self, opcode: u8) -> ParserResult<Operator> {
-        // Dispatch to the right
+        let cursor = self.cursor;
+        // Operator parse functions defined in `operator/` folder
+
+        // Blocks and functions return some type so the stack can't contain values
+        // more than the block return types at the time of block exit.
         let operation = match opcode {
             // CONTROL FLOW
-            0x0b => Operator::End,
             0x00 => Operator::Unreachable,
             0x01 => Operator::Nop,
             0x02 => unimplemented!(),
             0x03 => unimplemented!(),
             0x04 => unimplemented!(),
             0x05 => unimplemented!(),
+            0x0b => Operator::End,
             0x0c => unimplemented!(),
             0x0d => unimplemented!(),
             0x0e => unimplemented!(),
@@ -1281,136 +1304,137 @@ impl<'a> Parser<'a> {
             0x23 => unimplemented!(),
             0x24 => unimplemented!(),
             // MEMORY
-            0x28 => unimplemented!(),
-            0x29 => unimplemented!(),
-            0x2a => unimplemented!(),
-            0x2b => unimplemented!(),
-            0x2c => unimplemented!(),
-            0x2d => unimplemented!(),
-            0x2e => unimplemented!(),
-            0x2f => unimplemented!(),
-            0x30 => unimplemented!(),
-            0x31 => unimplemented!(),
-            0x32 => unimplemented!(),
-            0x33 => unimplemented!(),
-            0x34 => unimplemented!(),
-            0x35 => unimplemented!(),
-            0x36 => unimplemented!(),
-            0x37 => unimplemented!(),
-            0x38 => unimplemented!(),
-            0x39 => unimplemented!(),
-            0x3a => unimplemented!(),
-            0x3b => unimplemented!(),
-            0x3c => unimplemented!(),
-            0x3d => unimplemented!(),
-            0x3e => unimplemented!(),
-            0x3f => unimplemented!(),
-            0x40 => unimplemented!(),
+            0x28 => self.operator_memory_load(I32, Operator::I32Load)?,
+            0x29 => self.operator_memory_load(I64, Operator::I64Load)?,
+            0x2a => self.operator_memory_load(F32, Operator::F32Load)?,
+            0x2b => self.operator_memory_load(F64, Operator::F64Load)?,
+            0x2c => self.operator_memory_load(I32, Operator::I32Load8Signed)?,
+            0x2d => self.operator_memory_load(I32, Operator::I32Load8Unsigned)?,
+            0x2e => self.operator_memory_load(I32, Operator::I32Load16Signed)?,
+            0x2f => self.operator_memory_load(I32, Operator::I32Load16Unsigned)?,
+            0x30 => self.operator_memory_load(I64, Operator::I64Load8Signed)?,
+            0x31 => self.operator_memory_load(I64, Operator::I64Load8Unsigned)?,
+            0x32 => self.operator_memory_load(I64, Operator::I64Load16Signed)?,
+            0x33 => self.operator_memory_load(I64, Operator::I64Load16Unsigned)?,
+            0x34 => self.operator_memory_load(I64, Operator::I64Load32Signed)?,
+            0x35 => self.operator_memory_load(I64, Operator::I64Load32Unsigned)?,
+            0x36 => self.operator_memory_store(I32, Operator::I32Store)?,
+            0x37 => self.operator_memory_store(I64, Operator::I64Store)?,
+            0x38 => self.operator_memory_store(F32, Operator::F32Store)?,
+            0x39 => self.operator_memory_store(F64, Operator::F64Store)?,
+
+            0x3a => self.operator_memory_store(I32, Operator::I32Store8)?,
+            0x3b => self.operator_memory_store(I32, Operator::I32Store16)?,
+            0x3c => self.operator_memory_store(I64, Operator::I64Store8)?,
+            0x3d => self.operator_memory_store(I64, Operator::I64Store16)?,
+            0x3e => self.operator_memory_store(I64, Operator::I64Store32)?,
+            0x3f => self.operator_memory_size()?,
+            0x40 => self.operator_memory_grow()?,
             // CONSTANTS
-            0x41 => unimplemented!(),
-            0x42 => unimplemented!(),
-            0x43 => unimplemented!(),
-            0x44 => unimplemented!(),
+            0x41 => self.operator_i32_const()?,
+            0x42 => self.operator_i64_const()?,
+            0x43 => self.operator_f32_const()?,
+            0x44 => self.operator_f64_const()?,
             // COMPARISONS
-            0x45 => unimplemented!(),
-            0x46 => unimplemented!(),
-            0x47 => unimplemented!(),
-            0x48 => unimplemented!(),
-            0x49 => unimplemented!(),
-            0x4a => unimplemented!(),
-            0x4b => unimplemented!(),
-            0x4c => unimplemented!(),
-            0x4d => unimplemented!(),
-            0x4e => unimplemented!(),
-            0x4f => unimplemented!(),
-            0x50 => unimplemented!(),
-            0x51 => unimplemented!(),
-            0x52 => unimplemented!(),
-            0x53 => unimplemented!(),
-            0x54 => unimplemented!(),
-            0x55 => unimplemented!(),
-            0x56 => unimplemented!(),
-            0x57 => unimplemented!(),
-            0x58 => unimplemented!(),
-            0x59 => unimplemented!(),
-            0x5a => unimplemented!(),
-            0x5b => unimplemented!(),
-            0x5c => unimplemented!(),
-            0x5d => unimplemented!(),
-            0x5e => unimplemented!(),
-            0x5f => unimplemented!(),
-            0x60 => unimplemented!(),
-            0x61 => unimplemented!(),
-            0x62 => unimplemented!(),
-            0x63 => unimplemented!(),
-            0x64 => unimplemented!(),
-            0x65 => unimplemented!(),
-            0x66 => unimplemented!(),
+            0x45 => self.operator_numeric_1_args(I32, Operator::I32Eqz)?,
+            0x46 => self.operator_numeric_2_args(I32, Operator::I32Eq)?,
+            0x47 => self.operator_numeric_2_args(I32, Operator::I32Ne)?,
+            0x48 => self.operator_numeric_2_args(I32, Operator::I32LtSigned)?,
+            0x49 => self.operator_numeric_2_args(I32, Operator::I32LtUnsigned)?,
+            0x4a => self.operator_numeric_2_args(I32, Operator::I32GtSigned)?,
+            0x4b => self.operator_numeric_2_args(I32, Operator::I32GtSigned)?,
+            0x4c => self.operator_numeric_2_args(I32, Operator::I32LeSigned)?,
+            0x4d => self.operator_numeric_2_args(I32, Operator::I32LeUnsigned)?,
+            0x4e => self.operator_numeric_2_args(I32, Operator::I32GeSigned)?,
+            0x4f => self.operator_numeric_2_args(I32, Operator::I32GeSigned)?,
+            0x50 => self.operator_numeric_1_args(I64, Operator::I64Eqz)?,
+            0x51 => self.operator_numeric_2_args(I64, Operator::I64Eq)?,
+            0x52 => self.operator_numeric_2_args(I64, Operator::I64Ne)?,
+            0x53 => self.operator_numeric_2_args(I64, Operator::I64LtSigned)?,
+            0x54 => self.operator_numeric_2_args(I64, Operator::I64LtUnsigned)?,
+            0x55 => self.operator_numeric_2_args(I64, Operator::I64GtSigned)?,
+            0x56 => self.operator_numeric_2_args(I64, Operator::I64GtSigned)?,
+            0x57 => self.operator_numeric_2_args(I64, Operator::I64LeSigned)?,
+            0x58 => self.operator_numeric_2_args(I64, Operator::I64LeUnsigned)?,
+            0x59 => self.operator_numeric_2_args(I64, Operator::I64GeSigned)?,
+            0x5a => self.operator_numeric_2_args(I64, Operator::I64GeSigned)?,
+            0x5b => self.operator_numeric_2_args(F32, Operator::F32Eq)?,
+            0x5c => self.operator_numeric_2_args(F32, Operator::F32Ne)?,
+            0x5d => self.operator_numeric_2_args(F32, Operator::F32Lt)?,
+            0x5e => self.operator_numeric_2_args(F32, Operator::F32Gt)?,
+            0x5f => self.operator_numeric_2_args(F32, Operator::F32Le)?,
+            0x60 => self.operator_numeric_2_args(F32, Operator::F32Ge)?,
+            0x61 => self.operator_numeric_2_args(F64, Operator::F64Eq)?,
+            0x62 => self.operator_numeric_2_args(F64, Operator::F64Ne)?,
+            0x63 => self.operator_numeric_2_args(F64, Operator::F64Lt)?,
+            0x64 => self.operator_numeric_2_args(F64, Operator::F64Gt)?,
+            0x65 => self.operator_numeric_2_args(F64, Operator::F64Le)?,
+            0x66 => self.operator_numeric_2_args(F64, Operator::F64Ge)?,
             // NUMERIC
-            0x67 => unimplemented!(),
-            0x68 => unimplemented!(),
-            0x69 => unimplemented!(),
-            0x6a => unimplemented!(),
-            0x6b => unimplemented!(),
-            0x6c => unimplemented!(),
-            0x6d => unimplemented!(),
-            0x6e => unimplemented!(),
-            0x6f => unimplemented!(),
-            0x70 => unimplemented!(),
-            0x71 => unimplemented!(),
-            0x72 => unimplemented!(),
-            0x73 => unimplemented!(),
-            0x74 => unimplemented!(),
-            0x75 => unimplemented!(),
-            0x76 => unimplemented!(),
-            0x77 => unimplemented!(),
-            0x78 => unimplemented!(),
-            0x79 => unimplemented!(),
-            0x7a => unimplemented!(),
-            0x7b => unimplemented!(),
-            0x7c => unimplemented!(),
-            0x7d => unimplemented!(),
-            0x7e => unimplemented!(),
-            0x7f => unimplemented!(),
-            0x80 => unimplemented!(),
-            0x81 => unimplemented!(),
-            0x82 => unimplemented!(),
-            0x83 => unimplemented!(),
-            0x84 => unimplemented!(),
-            0x85 => unimplemented!(),
-            0x86 => unimplemented!(),
-            0x87 => unimplemented!(),
-            0x88 => unimplemented!(),
-            0x89 => unimplemented!(),
-            0x8a => unimplemented!(),
-            0x8b => unimplemented!(),
-            0x8c => unimplemented!(),
-            0x8d => unimplemented!(),
-            0x8e => unimplemented!(),
-            0x8f => unimplemented!(),
-            0x90 => unimplemented!(),
-            0x91 => unimplemented!(),
-            0x92 => unimplemented!(),
-            0x93 => unimplemented!(),
-            0x94 => unimplemented!(),
-            0x95 => unimplemented!(),
-            0x96 => unimplemented!(),
-            0x97 => unimplemented!(),
-            0x98 => unimplemented!(),
-            0x99 => unimplemented!(),
-            0x9a => unimplemented!(),
-            0x9b => unimplemented!(),
-            0x9c => unimplemented!(),
-            0x9d => unimplemented!(),
-            0x9e => unimplemented!(),
-            0x9f => unimplemented!(),
-            0xa0 => unimplemented!(),
-            0xa1 => unimplemented!(),
-            0xa2 => unimplemented!(),
-            0xa3 => unimplemented!(),
-            0xa4 => unimplemented!(),
-            0xa5 => unimplemented!(),
-            0xa6 => unimplemented!(),
+            0x67 => self.operator_numeric_1_args(I32, Operator::I32Clz)?,
+            0x68 => self.operator_numeric_1_args(I32, Operator::I32Ctz)?,
+            0x69 => self.operator_numeric_1_args(I32, Operator::I32Popcnt)?,
+            0x6a => self.operator_numeric_2_args(I32, Operator::I32Add)?,
+            0x6b => self.operator_numeric_2_args(I32, Operator::I32Sub)?,
+            0x6c => self.operator_numeric_2_args(I32, Operator::I32Mul)?,
+            0x6d => self.operator_numeric_2_args(I32, Operator::I32DivSigned)?,
+            0x6e => self.operator_numeric_2_args(I32, Operator::I32DivUnsigned)?,
+            0x6f => self.operator_numeric_2_args(I32, Operator::I32RemSigned)?,
+            0x70 => self.operator_numeric_2_args(I32, Operator::I32RemUnsigned)?,
+            0x71 => self.operator_numeric_2_args(I32, Operator::I32And)?,
+            0x72 => self.operator_numeric_2_args(I32, Operator::I32Or)?,
+            0x73 => self.operator_numeric_2_args(I32, Operator::I32Xor)?,
+            0x74 => self.operator_numeric_2_args(I32, Operator::I32Shl)?,
+            0x75 => self.operator_numeric_2_args(I32, Operator::I32ShrSigned)?,
+            0x76 => self.operator_numeric_2_args(I32, Operator::I32ShrUnsigned)?,
+            0x77 => self.operator_numeric_2_args(I32, Operator::I32Rotl)?,
+            0x78 => self.operator_numeric_2_args(I32, Operator::I32Rotr)?,
+            0x79 => self.operator_numeric_1_args(I64, Operator::I64Clz)?,
+            0x7a => self.operator_numeric_1_args(I64, Operator::I64Ctz)?,
+            0x7b => self.operator_numeric_1_args(I64, Operator::I64Popcnt)?,
+            0x7c => self.operator_numeric_2_args(I64, Operator::I64Add)?,
+            0x7d => self.operator_numeric_2_args(I64, Operator::I64Sub)?,
+            0x7e => self.operator_numeric_2_args(I64, Operator::I64Mul)?,
+            0x7f => self.operator_numeric_2_args(I64, Operator::I64DivSigned)?,
+            0x80 => self.operator_numeric_2_args(I64, Operator::I64DivUnsigned)?,
+            0x81 => self.operator_numeric_2_args(I64, Operator::I64RemSigned)?,
+            0x82 => self.operator_numeric_2_args(I64, Operator::I64RemUnsigned)?,
+            0x83 => self.operator_numeric_2_args(I64, Operator::I64And)?,
+            0x84 => self.operator_numeric_2_args(I64, Operator::I64Or)?,
+            0x85 => self.operator_numeric_2_args(I64, Operator::I64Xor)?,
+            0x86 => self.operator_numeric_2_args(I64, Operator::I64Shl)?,
+            0x87 => self.operator_numeric_2_args(I64, Operator::I64ShrSigned)?,
+            0x88 => self.operator_numeric_2_args(I64, Operator::I64ShrUnsigned)?,
+            0x89 => self.operator_numeric_2_args(I64, Operator::I64Rotl)?,
+            0x8a => self.operator_numeric_2_args(I64, Operator::I64Rotr)?,
+            0x8b => self.operator_numeric_1_args(F32, Operator::F32Abs)?,
+            0x8c => self.operator_numeric_1_args(F32, Operator::F32Neg)?,
+            0x8d => self.operator_numeric_1_args(F32, Operator::F32Ceil)?,
+            0x8e => self.operator_numeric_1_args(F32, Operator::F32Floor)?,
+            0x8f => self.operator_numeric_1_args(F32, Operator::F32Trunc)?,
+            0x90 => self.operator_numeric_1_args(F32, Operator::F32Nearest)?,
+            0x91 => self.operator_numeric_1_args(F32, Operator::F32Sqrt)?,
+            0x92 => self.operator_numeric_2_args(F32, Operator::F32Add)?,
+            0x93 => self.operator_numeric_2_args(F32, Operator::F32Sub)?,
+            0x94 => self.operator_numeric_2_args(F32, Operator::F32Mul)?,
+            0x95 => self.operator_numeric_2_args(F32, Operator::F32Div)?,
+            0x96 => self.operator_numeric_2_args(F32, Operator::F32Min)?,
+            0x97 => self.operator_numeric_2_args(F32, Operator::F32Max)?,
+            0x98 => self.operator_numeric_2_args(F32, Operator::F32CopySign)?,
+            0x99 => self.operator_numeric_1_args(F64, Operator::F64Abs)?,
+            0x9a => self.operator_numeric_1_args(F64, Operator::F64Neg)?,
+            0x9b => self.operator_numeric_1_args(F64, Operator::F64Ceil)?,
+            0x9c => self.operator_numeric_1_args(F64, Operator::F64Floor)?,
+            0x9d => self.operator_numeric_1_args(F64, Operator::F64Trunc)?,
+            0x9e => self.operator_numeric_1_args(F64, Operator::F64Nearest)?,
+            0x9f => self.operator_numeric_1_args(F64, Operator::F64Sqrt)?,
+            0xa0 => self.operator_numeric_2_args(F64, Operator::F64Add)?,
+            0xa1 => self.operator_numeric_2_args(F64, Operator::F64Sub)?,
+            0xa2 => self.operator_numeric_2_args(F64, Operator::F64Mul)?,
+            0xa3 => self.operator_numeric_2_args(F64, Operator::F64Div)?,
+            0xa4 => self.operator_numeric_2_args(F64, Operator::F64Min)?,
+            0xa5 => self.operator_numeric_2_args(F64, Operator::F64Max)?,
+            0xa6 => self.operator_numeric_2_args(F64, Operator::F64CopySign)?,
             // CONVERSIONS
             0xa7 => unimplemented!(),
             0xa8 => unimplemented!(),
@@ -1434,11 +1458,16 @@ impl<'a> Parser<'a> {
             0xba => unimplemented!(),
             0xbb => unimplemented!(),
             // REINTERPRETATIONS
-            0xbc => unimplemented!(),
-            0xbd => unimplemented!(),
-            0xbe => unimplemented!(),
-            0xbf => unimplemented!(),
-            _ => unimplemented!(),
+            0xbc => self.operator_numeric_1_args(F32, Operator::I32ReinterpretF32)?,
+            0xbd => self.operator_numeric_1_args(F64, Operator::I64ReinterpretF64)?,
+            0xbe => self.operator_numeric_1_args(I32, Operator::F32ReinterpretI32)?,
+            0xbf => self.operator_numeric_1_args(I64, Operator::F64ReinterpretI64)?,
+            _ => {
+                return Err(ParserError {
+                    kind: ErrorKind::UnsupportedOperator,
+                    cursor,
+                });
+            }
         };
 
         Ok(operation)
@@ -1495,7 +1524,7 @@ impl<'a> Parser<'a> {
     /******** TYPES ********/
 
     /// TODO: TEST
-    pub fn limits(&mut self) -> Result<(u32, Option<u32>), ParserError> {
+    pub fn limits(&mut self) -> ParserResult<(u32, Option<u32>)> {
         // verbose!("-> limits! <-");
         let cursor = self.cursor;
         let flags = get_value!(
@@ -1717,6 +1746,20 @@ impl<'a> Parser<'a> {
             let mut result = 0;
             for byte in bytes {
                 result |= (*byte as u32) << shift;
+                shift += 8;
+            }
+            return Ok(result);
+        }
+        Err(ErrorKind::BufferEndReached)
+    }
+
+    /// Consumes 8 bytes that represent a 64-bit unsigned integer
+    pub fn uint64(&mut self) -> Result<u64, ErrorKind> {
+        if let Some(bytes) = self.eat_bytes(8) {
+            let mut shift = 0;
+            let mut result = 0;
+            for byte in bytes {
+                result |= (*byte as u64) << shift;
                 shift += 8;
             }
             return Ok(result);

@@ -1,22 +1,25 @@
+//! USAGE: cargo run --example llvm --features "verbose"
 
-use wasmlite_parser::ir;
+mod utils;
 
+use wasmlite_utils::{verbose, debug, file::wat2wasm};
 use wasmlite_llvm::codegen;
-
-use wasmlite_llvm::{
-    types::{fn_type, BasicType},
-    values::IntValue,
-    Builder, Context, Module,
-};
-
+use wasmlite_parser::Parser;
+use utils::project_path;
 
 fn main() {
-    println!("\n=== [ llvm_example ] ===\n");
+    verbose!("\n=== [ llvm_example ] ===\n");
 
-    let empty_wasm_module = ir::Module { sections: vec![] };
+    let wasm_file = project_path("examples/wat/valid_export_section.wat");
 
-    // TODO
+    let wasm_module = Parser::new(&wat2wasm(wasm_file.as_str())).module().unwrap();
 
-    println!("\n=== [ llvm_example ] ===\n");
+    verbose!("wasm_module = {:#?}", wasm_module);
+
+    let llvm_module = codegen::generate_module(&wasm_module);
+
+    verbose!("llvm_module = {:?}", llvm_module);
+
+    verbose!("\n=== [ llvm_example ] ===\n");
 }
 

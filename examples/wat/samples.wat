@@ -87,3 +87,12 @@
 )
 
 ;; code section
+(module
+  (func $main (export "main") (result i32)
+    (i32.const 700)
+    (i32.const 077)
+    (i32.add)
+  )
+)
+
+
