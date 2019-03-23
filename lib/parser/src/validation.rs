@@ -12,7 +12,7 @@ impl<'a> Parser<'a> {
     /// Implementation based on Unicode Standard 11.0, Section 3.9, Table 3-7.
     // TODO: TEST THOROUGHLY!! (Codepoints, Grapheme Clusters, etc.)
     pub fn validate_utf8(&self, bytes: &[u8]) -> bool {
-        let cursor = self.cursor;
+        let _parser_cursor = self.cursor;
 
         let length = bytes.len();
         let mut cursor = 0;

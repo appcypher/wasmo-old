@@ -89,15 +89,8 @@ impl Stack {
 
     ///
     pub fn check_types(&self, types: &[ValueType]) -> bool {
-        let types_len = types.len();
-
-        // Take the first `types_len` values on the stack.
-        let types_iter = self.stack.iter().take(types_len);
-
-        // Convert values to types
-        let types_iter: Vec<ValueType> = types_iter.cloned().map(|x| x.into()).collect();
-
-        types_iter == types
+        let stack_types = self.types();
+        stack_types == types
     }
 }
 

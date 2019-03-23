@@ -213,13 +213,13 @@ impl<'a> Parser<'a> {
             0x03 => self.function_section()?,
             0x04 => self.table_section()?,
             0x05 => self.memory_section()?,
-            0x06 => self.global_section()?,
+            0x06 => self.global_section(sections)?,
             0x07 => self.export_section()?,
             0x08 => self.start_section()?,
-            0x09 => self.element_section()?,
+            0x09 => self.element_section(sections)?,
             // Code section needs `sections` to validate function calls and function return signature
             0x0A => self.code_section(sections)?,
-            0x0B => self.data_section()?,
+            0x0B => self.data_section(sections)?,
             _ => {
                 return Err(ParserError {
                     kind: ErrorKind::UnsupportedSection,
@@ -493,7 +493,7 @@ impl<'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn global_section(&mut self) -> ParserResult<Section> {
+    pub fn global_section(&mut self, sections: &HashMap<u8, Section>) -> ParserResult<Section> {
         verbose!("-> global_section! <-");
         let cursor = self.cursor;
         let mut globals = vec![];
@@ -520,7 +520,7 @@ impl<'a> Parser<'a> {
 
         // Consume the global entries.
         for _ in 0..global_count {
-            globals.push(self.global_entry()?);
+            globals.push(self.global_entry(sections)?);
         }
         verbose!("(global_section::global_entries = {:?})", globals);
 
@@ -591,7 +591,7 @@ impl<'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn element_section(&mut self) -> ParserResult<Section> {
+    pub fn element_section(&mut self, sections: &HashMap<u8, Section>) -> ParserResult<Section> {
         verbose!("-> element_section! <-");
         let cursor = self.cursor;
         let mut elements = vec![];
@@ -618,7 +618,7 @@ impl<'a> Parser<'a> {
 
         // Consume the element entries.
         for _ in 0..element_count {
-            elements.push(self.element_entry()?);
+            elements.push(self.element_entry(sections)?);
         }
         verbose!("(element_section::element_entries = {:?})", elements);
 
@@ -657,9 +657,9 @@ impl<'a> Parser<'a> {
         for (index, _) in (0..body_count).enumerate() {
             // TODO: Validate function exists
 
-            let signature = ir::get_type_by_code_index(index, sections);
+            let signature = ir::get_signature_by_body_index(index, sections).unwrap();
 
-            function_bodies.push(self.function_body(&signature)?);
+            function_bodies.push(self.function_body(&signature, sections)?);
         }
 
         verbose!("(code_section::function_bodies = {:?})", function_bodies);
@@ -669,7 +669,7 @@ impl<'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn data_section(&mut self) -> ParserResult<Section> {
+    pub fn data_section(&mut self, sections: &HashMap<u8, Section>) -> ParserResult<Section> {
         verbose!("-> data_section! <-");
         let cursor = self.cursor;
         let mut data = vec![];
@@ -696,7 +696,7 @@ impl<'a> Parser<'a> {
 
         // Consume the function entries.
         for _ in 0..entry_count {
-            data.push(self.data_entry()?);
+            data.push(self.data_entry(sections)?);
         }
         verbose!("(data_section::data_entries = {:?})", data);
 
@@ -906,7 +906,7 @@ impl<'a> Parser<'a> {
         verbose!("-> global_import! <-");
         let cursor = self.cursor;
 
-        let content_type = Type::from(get_value!(
+        let content_type = ValueType::from(get_value!(
             self.value_type(),
             cursor,
             IncompleteGlobalImport,
@@ -998,12 +998,12 @@ impl<'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn global_entry(&mut self) -> ParserResult<Global> {
+    pub fn global_entry(&mut self, sections: &HashMap<u8, Section>) -> ParserResult<Global> {
         verbose!("-> global_entry! <-");
         let cursor = self.cursor;
 
         // Get content type
-        let content_type = Type::from(get_value!(
+        let content_type = ValueType::from(get_value!(
             self.value_type(),
             cursor,
             IncompleteGlobalEntry,
@@ -1023,7 +1023,7 @@ impl<'a> Parser<'a> {
         verbose!("(global_entry::mutability = {:?})", mutability);
 
         // Consume instructions
-        let instructions = self.instructions()?;
+        let instructions = self.instructions(sections, None)?;
 
         Ok(Global {
             content_type,
@@ -1106,7 +1106,7 @@ impl<'a> Parser<'a> {
     /******** ELEMENT ********/
 
     /// TODO: TEST
-    pub fn element_entry(&mut self) -> ParserResult<Element> {
+    pub fn element_entry(&mut self, sections: &HashMap<u8, Section>) -> ParserResult<Element> {
         verbose!("-> element_entry! <-");
         let cursor = self.cursor;
         let mut func_indices = vec![];
@@ -1122,7 +1122,7 @@ impl<'a> Parser<'a> {
         verbose!("(element_entry::table_index = 0x{:x})", table_index);
 
         // Consume code.
-        let instructions = self.instructions()?;
+        let instructions = self.instructions(sections, None)?;
 
         // Get count of function indices.
         let func_count = get_value!(
@@ -1157,7 +1157,7 @@ impl<'a> Parser<'a> {
 
     /// TODO: TEST
     /// Each function body corresponds to the functions declared in the function section.
-    pub fn function_body(&mut self, signature: &FuncSignature) -> ParserResult<Function> {
+    pub fn function_body(&mut self, signature: &FuncSignature, sections: &HashMap<u8, Section>) -> ParserResult<Function> {
         verbose!("-> function_body! <-");
         let cursor = self.cursor;
         let mut locals = vec![];
@@ -1191,7 +1191,7 @@ impl<'a> Parser<'a> {
         }
 
         // Consume code.
-        let instructions = self.instructions()?;
+        let instructions = self.instructions(sections, Some(&locals))?;
 
         // Get the amount of bytes consumed for locals and code.
         let diff = self.cursor - start_pos;
@@ -1205,7 +1205,7 @@ impl<'a> Parser<'a> {
         }
 
         //
-        debug!("sig = {:?}, stack = {:?}", signature, self.stack);
+        debug!("Signature = {:#?}", signature);
 
         // Check if return signature matches stack type
         self.validate_function_return_signature(signature.clone())?;
@@ -1236,7 +1236,7 @@ impl<'a> Parser<'a> {
         verbose!("(local_entry::count = 0x{:x})", count);
 
         // Get type of the locals.
-        let local_type = Type::from(get_value!(
+        let local_type = ValueType::from(get_value!(
             self.value_type(),
             cursor,
             IncompleteLocalEntry,
@@ -1249,7 +1249,7 @@ impl<'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn instructions(&mut self) -> ParserResult<Vec<Operator>> {
+    pub fn instructions(&mut self, sections: &HashMap<u8, Section>, locals: Option<&[Local]>) -> ParserResult<Vec<Operator>> {
         verbose!("-> instructions! <-");
 
         let cursor = self.cursor;
@@ -1273,7 +1273,7 @@ impl<'a> Parser<'a> {
                 break;
             }
 
-            operators.push(self.operator(opcode)?);
+            operators.push(self.operator(opcode, sections, locals)?);
 
             debug!("Stack = {:?}\n", self.stack);
 
@@ -1287,21 +1287,21 @@ impl<'a> Parser<'a> {
     }
 
     /// TODO: TEST
-    pub fn operator(&mut self, opcode: u8) -> ParserResult<Operator> {
+    pub fn operator(&mut self, opcode: u8, sections: &HashMap<u8, Section>, locals: Option<&[Local]>) -> ParserResult<Operator> {
         let cursor = self.cursor;
         // Operator parse functions defined in `operator/` folder
 
         // Blocks and functions return some type so the stack can't contain values
         // more than the block return types at the time of block exit.
         let operation = match opcode {
-            // CONTROL FLOW
-            0x00 => Operator::Unreachable,
-            0x01 => Operator::Nop,
+            // CONTROL FLOW // TODO: Update stack
+            0x00 => Operator::Unreachable, // TODO: Update stack
+            0x01 => Operator::Nop, // TODO: Update stack
             0x02 => unimplemented!(),
             0x03 => unimplemented!(),
             0x04 => unimplemented!(),
             0x05 => unimplemented!(),
-            0x0b => Operator::End,
+            0x0b => Operator::End, // TODO: Update stack
             0x0c => unimplemented!(),
             0x0d => unimplemented!(),
             0x0e => unimplemented!(),
@@ -1313,11 +1313,11 @@ impl<'a> Parser<'a> {
             0x1A => unimplemented!(),
             0x1B => unimplemented!(),
             // VARIABLE ACCESS
-            0x20 => unimplemented!(),
-            0x21 => unimplemented!(),
-            0x22 => unimplemented!(),
-            0x23 => unimplemented!(),
-            0x24 => unimplemented!(),
+            0x20 => self.operator_local_get(locals)?,
+            0x21 => self.operator_local_set(locals)?,
+            0x22 => self.operator_local_tee(locals)?,
+            0x23 => self.operator_global_get(sections)?,
+            0x24 => self.operator_global_set(sections)?,
             // MEMORY
             0x28 => self.operator_memory_load(I32, Operator::I32Load)?,
             0x29 => self.operator_memory_load(I64, Operator::I64Load)?,
@@ -1337,7 +1337,6 @@ impl<'a> Parser<'a> {
             0x37 => self.operator_memory_store(I64, Operator::I64Store)?,
             0x38 => self.operator_memory_store(F32, Operator::F32Store)?,
             0x39 => self.operator_memory_store(F64, Operator::F64Store)?,
-
             0x3a => self.operator_memory_store(I32, Operator::I32Store8)?,
             0x3b => self.operator_memory_store(I32, Operator::I32Store16)?,
             0x3c => self.operator_memory_store(I64, Operator::I64Store8)?,
@@ -1351,132 +1350,132 @@ impl<'a> Parser<'a> {
             0x43 => self.operator_f32_const()?,
             0x44 => self.operator_f64_const()?,
             // COMPARISONS
-            0x45 => self.operator_numeric_1_args(I32, Operator::I32Eqz)?,
-            0x46 => self.operator_numeric_2_args(I32, Operator::I32Eq)?,
-            0x47 => self.operator_numeric_2_args(I32, Operator::I32Ne)?,
-            0x48 => self.operator_numeric_2_args(I32, Operator::I32LtSigned)?,
-            0x49 => self.operator_numeric_2_args(I32, Operator::I32LtUnsigned)?,
-            0x4a => self.operator_numeric_2_args(I32, Operator::I32GtSigned)?,
-            0x4b => self.operator_numeric_2_args(I32, Operator::I32GtSigned)?,
-            0x4c => self.operator_numeric_2_args(I32, Operator::I32LeSigned)?,
-            0x4d => self.operator_numeric_2_args(I32, Operator::I32LeUnsigned)?,
-            0x4e => self.operator_numeric_2_args(I32, Operator::I32GeSigned)?,
-            0x4f => self.operator_numeric_2_args(I32, Operator::I32GeSigned)?,
-            0x50 => self.operator_numeric_1_args(I64, Operator::I64Eqz)?,
-            0x51 => self.operator_numeric_2_args(I64, Operator::I64Eq)?,
-            0x52 => self.operator_numeric_2_args(I64, Operator::I64Ne)?,
-            0x53 => self.operator_numeric_2_args(I64, Operator::I64LtSigned)?,
-            0x54 => self.operator_numeric_2_args(I64, Operator::I64LtUnsigned)?,
-            0x55 => self.operator_numeric_2_args(I64, Operator::I64GtSigned)?,
-            0x56 => self.operator_numeric_2_args(I64, Operator::I64GtSigned)?,
-            0x57 => self.operator_numeric_2_args(I64, Operator::I64LeSigned)?,
-            0x58 => self.operator_numeric_2_args(I64, Operator::I64LeUnsigned)?,
-            0x59 => self.operator_numeric_2_args(I64, Operator::I64GeSigned)?,
-            0x5a => self.operator_numeric_2_args(I64, Operator::I64GeSigned)?,
-            0x5b => self.operator_numeric_2_args(F32, Operator::F32Eq)?,
-            0x5c => self.operator_numeric_2_args(F32, Operator::F32Ne)?,
-            0x5d => self.operator_numeric_2_args(F32, Operator::F32Lt)?,
-            0x5e => self.operator_numeric_2_args(F32, Operator::F32Gt)?,
-            0x5f => self.operator_numeric_2_args(F32, Operator::F32Le)?,
-            0x60 => self.operator_numeric_2_args(F32, Operator::F32Ge)?,
-            0x61 => self.operator_numeric_2_args(F64, Operator::F64Eq)?,
-            0x62 => self.operator_numeric_2_args(F64, Operator::F64Ne)?,
-            0x63 => self.operator_numeric_2_args(F64, Operator::F64Lt)?,
-            0x64 => self.operator_numeric_2_args(F64, Operator::F64Gt)?,
-            0x65 => self.operator_numeric_2_args(F64, Operator::F64Le)?,
-            0x66 => self.operator_numeric_2_args(F64, Operator::F64Ge)?,
+            0x45 => self.operator_numeric_1_arg(I32, I32, Operator::I32Eqz)?,
+            0x46 => self.operator_numeric_2_args(I32, I32, Operator::I32Eq)?,
+            0x47 => self.operator_numeric_2_args(I32, I32, Operator::I32Ne)?,
+            0x48 => self.operator_numeric_2_args(I32, I32, Operator::I32LtSigned)?,
+            0x49 => self.operator_numeric_2_args(I32, I32, Operator::I32LtUnsigned)?,
+            0x4a => self.operator_numeric_2_args(I32, I32, Operator::I32GtSigned)?,
+            0x4b => self.operator_numeric_2_args(I32, I32, Operator::I32GtSigned)?,
+            0x4c => self.operator_numeric_2_args(I32, I32, Operator::I32LeSigned)?,
+            0x4d => self.operator_numeric_2_args(I32, I32, Operator::I32LeUnsigned)?,
+            0x4e => self.operator_numeric_2_args(I32, I32, Operator::I32GeSigned)?,
+            0x4f => self.operator_numeric_2_args(I32, I32, Operator::I32GeSigned)?,
+            0x50 => self.operator_numeric_1_arg(I64, I32, Operator::I64Eqz)?,
+            0x51 => self.operator_numeric_2_args(I64, I32, Operator::I64Eq)?,
+            0x52 => self.operator_numeric_2_args(I64, I32, Operator::I64Ne)?,
+            0x53 => self.operator_numeric_2_args(I64, I32, Operator::I64LtSigned)?,
+            0x54 => self.operator_numeric_2_args(I64, I32, Operator::I64LtUnsigned)?,
+            0x55 => self.operator_numeric_2_args(I64, I32, Operator::I64GtSigned)?,
+            0x56 => self.operator_numeric_2_args(I64, I32, Operator::I64GtSigned)?,
+            0x57 => self.operator_numeric_2_args(I64, I32, Operator::I64LeSigned)?,
+            0x58 => self.operator_numeric_2_args(I64, I32, Operator::I64LeUnsigned)?,
+            0x59 => self.operator_numeric_2_args(I64, I32, Operator::I64GeSigned)?,
+            0x5a => self.operator_numeric_2_args(I64, I32, Operator::I64GeSigned)?,
+            0x5b => self.operator_numeric_2_args(F32, I32, Operator::F32Eq)?,
+            0x5c => self.operator_numeric_2_args(F32, I32, Operator::F32Ne)?,
+            0x5d => self.operator_numeric_2_args(F32, I32, Operator::F32Lt)?,
+            0x5e => self.operator_numeric_2_args(F32, I32, Operator::F32Gt)?,
+            0x5f => self.operator_numeric_2_args(F32, I32, Operator::F32Le)?,
+            0x60 => self.operator_numeric_2_args(F32, I32, Operator::F32Ge)?,
+            0x61 => self.operator_numeric_2_args(F64, I32, Operator::F64Eq)?,
+            0x62 => self.operator_numeric_2_args(F64, I32, Operator::F64Ne)?,
+            0x63 => self.operator_numeric_2_args(F64, I32, Operator::F64Lt)?,
+            0x64 => self.operator_numeric_2_args(F64, I32, Operator::F64Gt)?,
+            0x65 => self.operator_numeric_2_args(F64, I32, Operator::F64Le)?,
+            0x66 => self.operator_numeric_2_args(F64, I32, Operator::F64Ge)?,
             // NUMERIC
-            0x67 => self.operator_numeric_1_args(I32, Operator::I32Clz)?,
-            0x68 => self.operator_numeric_1_args(I32, Operator::I32Ctz)?,
-            0x69 => self.operator_numeric_1_args(I32, Operator::I32Popcnt)?,
-            0x6a => self.operator_numeric_2_args(I32, Operator::I32Add)?,
-            0x6b => self.operator_numeric_2_args(I32, Operator::I32Sub)?,
-            0x6c => self.operator_numeric_2_args(I32, Operator::I32Mul)?,
-            0x6d => self.operator_numeric_2_args(I32, Operator::I32DivSigned)?,
-            0x6e => self.operator_numeric_2_args(I32, Operator::I32DivUnsigned)?,
-            0x6f => self.operator_numeric_2_args(I32, Operator::I32RemSigned)?,
-            0x70 => self.operator_numeric_2_args(I32, Operator::I32RemUnsigned)?,
-            0x71 => self.operator_numeric_2_args(I32, Operator::I32And)?,
-            0x72 => self.operator_numeric_2_args(I32, Operator::I32Or)?,
-            0x73 => self.operator_numeric_2_args(I32, Operator::I32Xor)?,
-            0x74 => self.operator_numeric_2_args(I32, Operator::I32Shl)?,
-            0x75 => self.operator_numeric_2_args(I32, Operator::I32ShrSigned)?,
-            0x76 => self.operator_numeric_2_args(I32, Operator::I32ShrUnsigned)?,
-            0x77 => self.operator_numeric_2_args(I32, Operator::I32Rotl)?,
-            0x78 => self.operator_numeric_2_args(I32, Operator::I32Rotr)?,
-            0x79 => self.operator_numeric_1_args(I64, Operator::I64Clz)?,
-            0x7a => self.operator_numeric_1_args(I64, Operator::I64Ctz)?,
-            0x7b => self.operator_numeric_1_args(I64, Operator::I64Popcnt)?,
-            0x7c => self.operator_numeric_2_args(I64, Operator::I64Add)?,
-            0x7d => self.operator_numeric_2_args(I64, Operator::I64Sub)?,
-            0x7e => self.operator_numeric_2_args(I64, Operator::I64Mul)?,
-            0x7f => self.operator_numeric_2_args(I64, Operator::I64DivSigned)?,
-            0x80 => self.operator_numeric_2_args(I64, Operator::I64DivUnsigned)?,
-            0x81 => self.operator_numeric_2_args(I64, Operator::I64RemSigned)?,
-            0x82 => self.operator_numeric_2_args(I64, Operator::I64RemUnsigned)?,
-            0x83 => self.operator_numeric_2_args(I64, Operator::I64And)?,
-            0x84 => self.operator_numeric_2_args(I64, Operator::I64Or)?,
-            0x85 => self.operator_numeric_2_args(I64, Operator::I64Xor)?,
-            0x86 => self.operator_numeric_2_args(I64, Operator::I64Shl)?,
-            0x87 => self.operator_numeric_2_args(I64, Operator::I64ShrSigned)?,
-            0x88 => self.operator_numeric_2_args(I64, Operator::I64ShrUnsigned)?,
-            0x89 => self.operator_numeric_2_args(I64, Operator::I64Rotl)?,
-            0x8a => self.operator_numeric_2_args(I64, Operator::I64Rotr)?,
-            0x8b => self.operator_numeric_1_args(F32, Operator::F32Abs)?,
-            0x8c => self.operator_numeric_1_args(F32, Operator::F32Neg)?,
-            0x8d => self.operator_numeric_1_args(F32, Operator::F32Ceil)?,
-            0x8e => self.operator_numeric_1_args(F32, Operator::F32Floor)?,
-            0x8f => self.operator_numeric_1_args(F32, Operator::F32Trunc)?,
-            0x90 => self.operator_numeric_1_args(F32, Operator::F32Nearest)?,
-            0x91 => self.operator_numeric_1_args(F32, Operator::F32Sqrt)?,
-            0x92 => self.operator_numeric_2_args(F32, Operator::F32Add)?,
-            0x93 => self.operator_numeric_2_args(F32, Operator::F32Sub)?,
-            0x94 => self.operator_numeric_2_args(F32, Operator::F32Mul)?,
-            0x95 => self.operator_numeric_2_args(F32, Operator::F32Div)?,
-            0x96 => self.operator_numeric_2_args(F32, Operator::F32Min)?,
-            0x97 => self.operator_numeric_2_args(F32, Operator::F32Max)?,
-            0x98 => self.operator_numeric_2_args(F32, Operator::F32CopySign)?,
-            0x99 => self.operator_numeric_1_args(F64, Operator::F64Abs)?,
-            0x9a => self.operator_numeric_1_args(F64, Operator::F64Neg)?,
-            0x9b => self.operator_numeric_1_args(F64, Operator::F64Ceil)?,
-            0x9c => self.operator_numeric_1_args(F64, Operator::F64Floor)?,
-            0x9d => self.operator_numeric_1_args(F64, Operator::F64Trunc)?,
-            0x9e => self.operator_numeric_1_args(F64, Operator::F64Nearest)?,
-            0x9f => self.operator_numeric_1_args(F64, Operator::F64Sqrt)?,
-            0xa0 => self.operator_numeric_2_args(F64, Operator::F64Add)?,
-            0xa1 => self.operator_numeric_2_args(F64, Operator::F64Sub)?,
-            0xa2 => self.operator_numeric_2_args(F64, Operator::F64Mul)?,
-            0xa3 => self.operator_numeric_2_args(F64, Operator::F64Div)?,
-            0xa4 => self.operator_numeric_2_args(F64, Operator::F64Min)?,
-            0xa5 => self.operator_numeric_2_args(F64, Operator::F64Max)?,
-            0xa6 => self.operator_numeric_2_args(F64, Operator::F64CopySign)?,
+            0x67 => self.operator_numeric_1_arg(I32, I32, Operator::I32Clz)?,
+            0x68 => self.operator_numeric_1_arg(I32, I32, Operator::I32Ctz)?,
+            0x69 => self.operator_numeric_1_arg(I32, I32, Operator::I32Popcnt)?,
+            0x6a => self.operator_numeric_2_args(I32, I32, Operator::I32Add)?,
+            0x6b => self.operator_numeric_2_args(I32, I32, Operator::I32Sub)?,
+            0x6c => self.operator_numeric_2_args(I32, I32, Operator::I32Mul)?,
+            0x6d => self.operator_numeric_2_args(I32, I32, Operator::I32DivSigned)?,
+            0x6e => self.operator_numeric_2_args(I32, I32, Operator::I32DivUnsigned)?,
+            0x6f => self.operator_numeric_2_args(I32, I32, Operator::I32RemSigned)?,
+            0x70 => self.operator_numeric_2_args(I32, I32, Operator::I32RemUnsigned)?,
+            0x71 => self.operator_numeric_2_args(I32, I32, Operator::I32And)?,
+            0x72 => self.operator_numeric_2_args(I32, I32, Operator::I32Or)?,
+            0x73 => self.operator_numeric_2_args(I32, I32, Operator::I32Xor)?,
+            0x74 => self.operator_numeric_2_args(I32, I32, Operator::I32Shl)?,
+            0x75 => self.operator_numeric_2_args(I32, I32, Operator::I32ShrSigned)?,
+            0x76 => self.operator_numeric_2_args(I32, I32, Operator::I32ShrUnsigned)?,
+            0x77 => self.operator_numeric_2_args(I32, I32, Operator::I32Rotl)?,
+            0x78 => self.operator_numeric_2_args(I32, I32, Operator::I32Rotr)?,
+            0x79 => self.operator_numeric_1_arg(I64, I64, Operator::I64Clz)?,
+            0x7a => self.operator_numeric_1_arg(I64, I64, Operator::I64Ctz)?,
+            0x7b => self.operator_numeric_1_arg(I64, I64, Operator::I64Popcnt)?,
+            0x7c => self.operator_numeric_2_args(I64, I64, Operator::I64Add)?,
+            0x7d => self.operator_numeric_2_args(I64, I64, Operator::I64Sub)?,
+            0x7e => self.operator_numeric_2_args(I64, I64, Operator::I64Mul)?,
+            0x7f => self.operator_numeric_2_args(I64, I64, Operator::I64DivSigned)?,
+            0x80 => self.operator_numeric_2_args(I64, I64, Operator::I64DivUnsigned)?,
+            0x81 => self.operator_numeric_2_args(I64, I64, Operator::I64RemSigned)?,
+            0x82 => self.operator_numeric_2_args(I64, I64, Operator::I64RemUnsigned)?,
+            0x83 => self.operator_numeric_2_args(I64, I64, Operator::I64And)?,
+            0x84 => self.operator_numeric_2_args(I64, I64, Operator::I64Or)?,
+            0x85 => self.operator_numeric_2_args(I64, I64, Operator::I64Xor)?,
+            0x86 => self.operator_numeric_2_args(I64, I64, Operator::I64Shl)?,
+            0x87 => self.operator_numeric_2_args(I64, I64, Operator::I64ShrSigned)?,
+            0x88 => self.operator_numeric_2_args(I64, I64, Operator::I64ShrUnsigned)?,
+            0x89 => self.operator_numeric_2_args(I64, I64, Operator::I64Rotl)?,
+            0x8a => self.operator_numeric_2_args(I64, I64, Operator::I64Rotr)?,
+            0x8b => self.operator_numeric_1_arg(F32, F32, Operator::F32Abs)?,
+            0x8c => self.operator_numeric_1_arg(F32, F32, Operator::F32Neg)?,
+            0x8d => self.operator_numeric_1_arg(F32, F32, Operator::F32Ceil)?,
+            0x8e => self.operator_numeric_1_arg(F32, F32, Operator::F32Floor)?,
+            0x8f => self.operator_numeric_1_arg(F32, F32, Operator::F32Trunc)?,
+            0x90 => self.operator_numeric_1_arg(F32, F32, Operator::F32Nearest)?,
+            0x91 => self.operator_numeric_1_arg(F32, F32, Operator::F32Sqrt)?,
+            0x92 => self.operator_numeric_2_args(F32, F32, Operator::F32Add)?,
+            0x93 => self.operator_numeric_2_args(F32, F32, Operator::F32Sub)?,
+            0x94 => self.operator_numeric_2_args(F32, F32, Operator::F32Mul)?,
+            0x95 => self.operator_numeric_2_args(F32, F32, Operator::F32Div)?,
+            0x96 => self.operator_numeric_2_args(F32, F32, Operator::F32Min)?,
+            0x97 => self.operator_numeric_2_args(F32, F32, Operator::F32Max)?,
+            0x98 => self.operator_numeric_2_args(F32, F32, Operator::F32CopySign)?,
+            0x99 => self.operator_numeric_1_arg(F64, F64, Operator::F64Abs)?,
+            0x9a => self.operator_numeric_1_arg(F64, F64, Operator::F64Neg)?,
+            0x9b => self.operator_numeric_1_arg(F64, F64, Operator::F64Ceil)?,
+            0x9c => self.operator_numeric_1_arg(F64, F64, Operator::F64Floor)?,
+            0x9d => self.operator_numeric_1_arg(F64, F64, Operator::F64Trunc)?,
+            0x9e => self.operator_numeric_1_arg(F64, F64, Operator::F64Nearest)?,
+            0x9f => self.operator_numeric_1_arg(F64, F64, Operator::F64Sqrt)?,
+            0xa0 => self.operator_numeric_2_args(F64, F64, Operator::F64Add)?,
+            0xa1 => self.operator_numeric_2_args(F64, F64, Operator::F64Sub)?,
+            0xa2 => self.operator_numeric_2_args(F64, F64, Operator::F64Mul)?,
+            0xa3 => self.operator_numeric_2_args(F64, F64, Operator::F64Div)?,
+            0xa4 => self.operator_numeric_2_args(F64, F64, Operator::F64Min)?,
+            0xa5 => self.operator_numeric_2_args(F64, F64, Operator::F64Max)?,
+            0xa6 => self.operator_numeric_2_args(F64, F64, Operator::F64CopySign)?,
             // CONVERSIONS
-            0xa7 => unimplemented!(),
-            0xa8 => unimplemented!(),
-            0xa9 => unimplemented!(),
-            0xaa => unimplemented!(),
-            0xab => unimplemented!(),
-            0xac => unimplemented!(),
-            0xad => unimplemented!(),
-            0xae => unimplemented!(),
-            0xaf => unimplemented!(),
-            0xb0 => unimplemented!(),
-            0xb1 => unimplemented!(),
-            0xb2 => unimplemented!(),
-            0xb3 => unimplemented!(),
-            0xb4 => unimplemented!(),
-            0xb5 => unimplemented!(),
-            0xb6 => unimplemented!(),
-            0xb7 => unimplemented!(),
-            0xb8 => unimplemented!(),
-            0xb9 => unimplemented!(),
-            0xba => unimplemented!(),
-            0xbb => unimplemented!(),
+            0xa7 => self.operator_numeric_1_arg(I64, I32, Operator::I32WrapI64)?,
+            0xa8 => self.operator_numeric_1_arg(F32, I32, Operator::I32TruncF32Signed)?,
+            0xa9 => self.operator_numeric_1_arg(F32, I32, Operator::I32TruncF32Unsigned)?,
+            0xaa => self.operator_numeric_1_arg(F64, I32, Operator::I32TruncF64Signed)?,
+            0xab => self.operator_numeric_1_arg(F64, I32, Operator::I32TruncF64Unsigned)?,
+            0xac => self.operator_numeric_1_arg(I32, I64, Operator::I64ExtendI32Signed)?,
+            0xad => self.operator_numeric_1_arg(I32, I64, Operator::I64ExtendI32Unsigned)?,
+            0xae => self.operator_numeric_1_arg(F32, I64, Operator::I64TruncF32Signed)?,
+            0xaf => self.operator_numeric_1_arg(F32, I64, Operator::I64TruncF32Unsigned)?,
+            0xb0 => self.operator_numeric_1_arg(F64, I64, Operator::I64TruncF64Signed)?,
+            0xb1 => self.operator_numeric_1_arg(F64, I64, Operator::I64TruncF64Unsigned)?,
+            0xb2 => self.operator_numeric_1_arg(I32, F32, Operator::F32ConvertI32Signed)?,
+            0xb3 => self.operator_numeric_1_arg(I32, F32, Operator::F32ConvertI32Unsigned)?,
+            0xb4 => self.operator_numeric_1_arg(I64, F32, Operator::F32ConvertI64Signed)?,
+            0xb5 => self.operator_numeric_1_arg(I64, F32, Operator::F32ConvertI64Unsigned)?,
+            0xb6 => self.operator_numeric_1_arg(F64, F32, Operator::F32DemoteF64)?,
+            0xb7 => self.operator_numeric_1_arg(I32, F64, Operator::F64ConvertI32Signed)?,
+            0xb8 => self.operator_numeric_1_arg(I32, F64, Operator::F64ConvertI32Unsigned)?,
+            0xb9 => self.operator_numeric_1_arg(I64, F64, Operator::F64ConvertI64Signed)?,
+            0xba => self.operator_numeric_1_arg(I64, F64, Operator::F64ConvertI64Unsigned)?,
+            0xbb => self.operator_numeric_1_arg(F32, F64, Operator::F64PromoteF32)?,
             // REINTERPRETATIONS
-            0xbc => self.operator_numeric_1_args(F32, Operator::I32ReinterpretF32)?,
-            0xbd => self.operator_numeric_1_args(F64, Operator::I64ReinterpretF64)?,
-            0xbe => self.operator_numeric_1_args(I32, Operator::F32ReinterpretI32)?,
-            0xbf => self.operator_numeric_1_args(I64, Operator::F64ReinterpretI64)?,
+            0xbc => self.operator_numeric_1_arg(F32, I32, Operator::I32ReinterpretF32)?,
+            0xbd => self.operator_numeric_1_arg(F64, I64, Operator::I64ReinterpretF64)?,
+            0xbe => self.operator_numeric_1_arg(I32, F32, Operator::F32ReinterpretI32)?,
+            0xbf => self.operator_numeric_1_arg(I64, F64, Operator::F64ReinterpretI64)?,
             _ => {
                 return Err(ParserError {
                     kind: ErrorKind::UnsupportedOperator,
@@ -1491,7 +1490,7 @@ impl<'a> Parser<'a> {
     /******** DATA ********/
 
     /// TODO: TEST
-    pub fn data_entry(&mut self) -> ParserResult<Data> {
+    pub fn data_entry(&mut self, sections: &HashMap<u8, Section>) -> ParserResult<Data> {
         verbose!("-> data_entry! <-");
         let cursor = self.cursor;
 
@@ -1506,7 +1505,7 @@ impl<'a> Parser<'a> {
         verbose!("(data_entry::memory_index = 0x{:x})", memory_index);
 
         // Consume code.
-        let instructions = self.instructions()?;
+        let instructions = self.instructions(sections, None)?;
 
         // Get count of following bytes.
         let byte_count = get_value!(

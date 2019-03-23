@@ -315,11 +315,11 @@ end         | byte [0x0b]
 
         operator      | id   | immediates
         :-------------|:-----|:---------
-        get_local	  | 0x20 | varuint32 (local_index)
-        set_local	  | 0x21 | varuint32 (local_index)
-        tee_local	  | 0x22 | varuint32 (local_index)
-        get_global	  | 0x23 | varuint32 (global_index)
-        set_global	  | 0x24 | varuint32 (global_index)
+        local.get	  | 0x20 | varuint32 (local_index)
+        local.set	  | 0x21 | varuint32 (local_index)
+        local.tee	  | 0x22 | varuint32 (local_index)
+        global.get	  | 0x23 | varuint32 (global_index)
+        global.set	  | 0x24 | varuint32 (global_index)
 
     - MEMORY
 

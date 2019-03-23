@@ -229,6 +229,11 @@ pub enum ErrorKind {
     // ExternalKind
     InvalidImportType,
 
+    //------------ VARIABLES --------//
+    
+    LocalDoesNotExist,
+    GlobalDoesNotExist,
+
     //------------ OPERATORS --------//
 
     UnsupportedOperator,

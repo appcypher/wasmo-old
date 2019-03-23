@@ -1,29 +1,49 @@
 use hashbrown::HashMap;
 
-// TODO: Improve code
-pub fn get_type_by_code_index<'a>(code_index: usize, sections: &HashMap<u8, Section>) -> FuncSignature {
-    // Get the functions
-    match sections.get(&0x03).unwrap() {
-        Section::Function(functions) => {
-            // Get the function
-            let function = functions[code_index];
-            // Get the types
-            match sections.get(&0x01).unwrap() {
-                Section::Type(types) => {
-                    // Get the signature
-                    match &types[function as usize] {
-                        Type::Func(sig) => sig.clone(),
-                        _ => unreachable!(),
-                    }
-                },
-                _ => unreachable!(),
+///
+pub fn get_signature_by_body_index(
+    body_index: usize,
+    sections: &HashMap<u8, Section>,
+) -> Option<FuncSignature> {
+    // Get the function
+    let signature_index = get_function_by_index(body_index, sections)?;
+
+    // Get the signature
+    get_signature_by_index(signature_index as usize, sections)
+}
+
+///
+pub fn get_signature_by_index(
+    index: usize,
+    sections: &HashMap<u8, Section>,
+) -> Option<FuncSignature> {
+    match sections.get(&0x01).unwrap() {
+        Section::Type(types) => {
+            // Get the signature
+            match &types[index] {
+                Type::Func(sig) => Some(sig.clone()),
+                _ => None,
             }
-        },
-        _ => unreachable!(),
+        }
+        _ => None,
     }
 }
 
+///
+pub fn get_function_by_index(index: usize, sections: &HashMap<u8, Section>) -> Option<u32> {
+    match sections.get(&0x03).unwrap() {
+        Section::Function(functions) => Some(functions[index]),
+        _ => None,
+    }
+}
 
+///
+pub fn get_global_by_index(index: u32, sections: &HashMap<u8, Section>) -> Option<Global> {
+    match sections.get(&0x06).unwrap() {
+        Section::Global(globals) => Some(globals[index as usize].clone()),
+        _ => None,
+    }
+}
 
 ///
 #[derive(Debug, Clone)]
@@ -85,6 +105,7 @@ impl From<i8> for ValueType {
 ///
 #[derive(Debug, Clone)]
 pub struct Module {
+    // TODO: Change this to Vecs of Vecs vec![ type: vec![], import: vec![], function: vec![], table: vec![], ..., customs: ... ]
     pub sections: HashMap<u8, Section>,
 }
 
@@ -122,7 +143,7 @@ pub enum ImportDesc {
     Table(Table),
     Memory(Memory),
     Global {
-        content_type: Type,
+        content_type: ValueType,
         mutability: bool,
     },
 }
@@ -145,7 +166,7 @@ pub struct Memory {
 ///
 #[derive(Debug, Clone)]
 pub struct Global {
-    pub content_type: Type,
+    pub content_type: ValueType,
     pub mutability: bool,
     pub instructions: Vec<Operator>,
 }
@@ -177,7 +198,7 @@ pub struct Data {
 #[derive(Debug, Clone)]
 pub struct Local {
     pub count: u32,
-    pub local_type: Type,
+    pub local_type: ValueType,
 }
 
 ///
@@ -203,12 +224,18 @@ pub enum Operator {
     Nop,
     Unreachable,
 
-    // CONSTANT
-    // (value: Imm)
-    I32Const(i32),
-    I64Const(i64),
-    F32Const(f32),
-    F64Const(f64),
+    // VARIABLE ACCESS
+    // (local_index: Imm) -> T
+    LocalGet(u32),
+    // (local_index: Imm, value: T)
+    LocalSet(u32, usize),
+    // (local_index: Imm, value: T) -> T
+    LocalTee(u32, usize),
+
+    // (global_index: Imm, value: T)
+    GlobalGet(u32),
+    // (global_index: Imm, value: T)
+    GlobalSet(u32, usize),
 
     // MEMORY
     // (align: Imm, offset: Imm, base: I32) -> T
@@ -251,6 +278,65 @@ pub enum Operator {
 
     // () -> I32
     MemorySize,
+
+    // CONSTANT
+    // (value: Imm)
+    I32Const(i32),
+    I64Const(i64),
+    F32Const(f32),
+    F64Const(f64),
+
+    // COMPARISONS
+    // (value: T) -> I32
+    I32Eqz(usize),
+    I64Eqz(usize),
+
+    // (lhs: T, rhs: T) -> I32
+    I32Eq(usize, usize),
+    I64Eq(usize, usize),
+    F32Eq(usize, usize),
+    F64Eq(usize, usize),
+
+    I32Ne(usize, usize),
+    I64Ne(usize, usize),
+    F32Ne(usize, usize),
+    F64Ne(usize, usize),
+
+    I32LtSigned(usize, usize),
+    I64LtSigned(usize, usize),
+
+    I32LtUnsigned(usize, usize),
+    I64LtUnsigned(usize, usize),
+
+    I32GtSigned(usize, usize),
+    I64GtSigned(usize, usize),
+
+    I32GtUnsigned(usize, usize),
+    I64GtUnsigned(usize, usize),
+
+    I32LeSigned(usize, usize),
+    I64LeSigned(usize, usize),
+
+    I32LeUnsigned(usize, usize),
+    I64LeUnsigned(usize, usize),
+
+    I32GeSigned(usize, usize),
+    I64GeSigned(usize, usize),
+
+    I32GeUnsigned(usize, usize),
+    I64GeUnsigned(usize, usize),
+
+    F32Lt(usize, usize),
+    F64Lt(usize, usize),
+
+    F32Gt(usize, usize),
+    F64Gt(usize, usize),
+
+    F32Le(usize, usize),
+    F64Le(usize, usize),
+
+    F32Ge(usize, usize),
+    F64Ge(usize, usize),
 
     // NUMERIC
     // (value: T) -> T
@@ -349,57 +435,40 @@ pub enum Operator {
     F32Sqrt(usize),
     F64Sqrt(usize),
 
-    // COMPARISONS
-    // (value: T) -> I32
-    I32Eqz(usize),
-    I64Eqz(usize),
+    // CONVERSIONS
+    // (value: T) -> U
+    I32WrapI64(usize),
 
-    // (lhs: T, rhs: T) -> I32
-    I32Eq(usize, usize),
-    I64Eq(usize, usize),
-    F32Eq(usize, usize),
-    F64Eq(usize, usize),
+    I32TruncF32Signed(usize),
+    I32TruncF32Unsigned(usize),
 
-    I32Ne(usize, usize),
-    I64Ne(usize, usize),
-    F32Ne(usize, usize),
-    F64Ne(usize, usize),
+    I32TruncF64Signed(usize),
+    I32TruncF64Unsigned(usize),
 
-    I32LtSigned(usize, usize),
-    I64LtSigned(usize, usize),
+    I64ExtendI32Signed(usize),
+    I64ExtendI32Unsigned(usize),
 
-    I32LtUnsigned(usize, usize),
-    I64LtUnsigned(usize, usize),
+    I64TruncF32Signed(usize),
+    I64TruncF32Unsigned(usize),
 
-    I32GtSigned(usize, usize),
-    I64GtSigned(usize, usize),
+    I64TruncF64Signed(usize),
+    I64TruncF64Unsigned(usize),
 
-    I32GtUnsigned(usize, usize),
-    I64GtUnsigned(usize, usize),
+    F32ConvertI32Signed(usize),
+    F32ConvertI32Unsigned(usize),
 
-    I32LeSigned(usize, usize),
-    I64LeSigned(usize, usize),
+    F32ConvertI64Signed(usize),
+    F32ConvertI64Unsigned(usize),
 
-    I32LeUnsigned(usize, usize),
-    I64LeUnsigned(usize, usize),
+    F32DemoteF64(usize),
 
-    I32GeSigned(usize, usize),
-    I64GeSigned(usize, usize),
+    F64ConvertI32Signed(usize),
+    F64ConvertI32Unsigned(usize),
 
-    I32GeUnsigned(usize, usize),
-    I64GeUnsigned(usize, usize),
+    F64ConvertI64Signed(usize),
+    F64ConvertI64Unsigned(usize),
 
-    F32Lt(usize, usize),
-    F64Lt(usize, usize),
-
-    F32Gt(usize, usize),
-    F64Gt(usize, usize),
-
-    F32Le(usize, usize),
-    F64Le(usize, usize),
-
-    F32Ge(usize, usize),
-    F64Ge(usize, usize),
+    F64PromoteF32(usize),
 
     // REINTERPRETATIONS
     // (value: T) -> U
@@ -408,27 +477,3 @@ pub enum Operator {
     F32ReinterpretI32(usize),
     F64ReinterpretI64(usize),
 }
-
-
-
-        // i32.wrap_i64        | 0xa7  |
-        // i32.trunc_f32_s     | 0xa8  |
-        // i32.trunc_f32_u     | 0xa9  |
-        // i32.trunc_f64_s     | 0xaa  |
-        // i32.trunc_f64_u     | 0xab  |
-        // i64.extend_i32_s    | 0xac  |
-        // i64.extend_i32_u    | 0xad  |
-        // i64.trunc_f32_s     | 0xae  |
-        // i64.trunc_f32_u     | 0xaf  |
-        // i64.trunc_f64_s     | 0xb0  |
-        // i64.trunc_f64_u     | 0xb1  |
-        // f32.convert_i32_s   | 0xb2  |
-        // f32.convert_i32_u   | 0xb3  |
-        // f32.convert_i64_s   | 0xb4  |
-        // f32.convert_i64_u   | 0xb5  |
-        // f32.demote_f64      | 0xb6  |
-        // f64.convert_i32_s   | 0xb7  |
-        // f64.convert_i32_u   | 0xb8  |
-        // f64.convert_i64_s   | 0xb9  |
-        // f64.convert_i64_u   | 0xba  |
-        // f64.promote_f32     | 0xbb  |
