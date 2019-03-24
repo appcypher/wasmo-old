@@ -230,7 +230,7 @@ pub enum ErrorKind {
     InvalidImportType,
 
     //------------ VARIABLES --------//
-    
+
     LocalDoesNotExist,
     GlobalDoesNotExist,
 
@@ -249,6 +249,10 @@ pub enum ErrorKind {
     MismatchedFunctionReturnSignature {
         expected: ir::FuncSignature,
         return_type_found: Vec<ir::ValueType>,
+    },
+    MismatchedBlockResultSignature {
+        expected: Vec<ir::BlockType>,
+        found: Vec<ir::ValueType>,
     },
     // Memory
     IncompleteMemoryOperator,

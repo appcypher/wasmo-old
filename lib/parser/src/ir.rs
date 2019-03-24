@@ -19,10 +19,14 @@ pub fn get_signature_by_index(
 ) -> Option<FuncSignature> {
     match sections.get(&0x01).unwrap() {
         Section::Type(types) => {
-            // Get the signature
-            match &types[index] {
-                Type::Func(sig) => Some(sig.clone()),
-                _ => None,
+            if (index as usize) < types.len() {
+                // Get the signature
+                match &types[index] {
+                    Type::Func(sig) => Some(sig.clone()),
+                    _ => None,
+                }
+            } else {
+                None
             }
         }
         _ => None,
@@ -40,7 +44,13 @@ pub fn get_function_by_index(index: usize, sections: &HashMap<u8, Section>) -> O
 ///
 pub fn get_global_by_index(index: u32, sections: &HashMap<u8, Section>) -> Option<Global> {
     match sections.get(&0x06).unwrap() {
-        Section::Global(globals) => Some(globals[index as usize].clone()),
+        Section::Global(globals) => {
+            if (index as usize) < globals.len() {
+                Some(globals[index as usize].clone())
+            } else {
+                None
+            }
+        }
         _ => None,
     }
 }
@@ -90,6 +100,15 @@ pub enum ValueType {
     F64,
 }
 
+impl ValueType {
+    pub fn is_value_type(type_id: i8) -> bool {
+        match type_id {
+            -0x04...-0x01 => true,
+            _ => false,
+        }
+    }
+}
+
 impl From<i8> for ValueType {
     fn from(value: i8) -> Self {
         match value {
@@ -102,6 +121,22 @@ impl From<i8> for ValueType {
     }
 }
 
+///
+#[derive(Debug, Clone, PartialEq)]
+pub enum BlockType {
+    Type(ValueType),
+    Void,
+}
+
+impl From<i8> for BlockType {
+    fn from(value: i8) -> Self {
+        match value {
+            -0x04...-0x01 => BlockType::Type(ValueType::from(value)),
+            -0x40 => BlockType::Void,
+            _ => unreachable!(),
+        }
+    }
+}
 ///
 #[derive(Debug, Clone)]
 pub struct Module {
@@ -218,11 +253,31 @@ pub enum ExportDesc {
 }
 
 ///
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Operator {
     End,
     Nop,
     Unreachable,
+
+
+
+    // CONTROL FLOW
+    // (instructions: Instr) -> I32
+    Block(Vec<Operator>),
+    // (cond: I32, f: Instr, else: Instr) -> I32
+    If(usize, Vec<Operator>, Vec<Operator>),
+    // (label: Imm)
+    Br(u32),
+    // (cond: I32, label: Imm)
+    BrIf(u32, usize),
+    // (cond: I32, label: I32, )
+    BrTable(usize),
+
+    // PARAMETRIC
+    // (value: T)
+    Drop,
+    // (cond: I32, lhs: T, rhs: T) -> T
+    Select(),
 
     // VARIABLE ACCESS
     // (local_index: Imm) -> T

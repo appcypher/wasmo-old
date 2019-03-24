@@ -17,7 +17,7 @@ impl<'a> Parser<'a> {
     ) -> ParserResult<Operator> {
         let cursor = self.cursor;
 
-        // TODO +++++++++ Resuse ++++++
+        // TODO: Abstract
 
         // TODO: Validation => alignment_log2 in [1, 2, 4]
         let alignment_log2 = get_value!(
@@ -98,7 +98,7 @@ impl<'a> Parser<'a> {
             IncompleteExpression,
             MalformedOpcodeInExpression
         );
-        
+
         self.stack.push(StackValue::new(I32, self.operator_index));
 
         Ok(Operator::MemorySize)

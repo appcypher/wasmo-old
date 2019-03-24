@@ -15,7 +15,14 @@ fn main() {
     // let wasm_module = Parser::new(&valid_i64_add_nested_operation()).module();
     // let wasm_module = Parser::new(&test_samples::valid_local_get()).module();
     // let wasm_module = Parser::new(&test_samples::valid_local_set()).module();
-    let wasm_module = Parser::new(&test_samples::valid_local_tee()).module();
+    // let wasm_module = Parser::new(&test_samples::valid_local_tee()).module();
+    // let wasm_module = Parser::new(&test_samples::valid_nop()).module();
+    // let wasm_module = Parser::new(&test_samples::valid_global_get()).module();
+    // let wasm_module = Parser::new(&test_samples::invalid_global_get_non_existent_global()).module();
+    // let wasm_module = Parser::new(&test_samples::valid_global_set()).module();
+    // let wasm_module = Parser::new(&test_samples::valid_drop()).module();
+    // let wasm_module = Parser::new(&test_samples::valid_block()).module();
+    let wasm_module = Parser::new(&test_samples::valid_block_additional_stack_values()).module();
 
     // get_local, set_local, tee_local, tee_global, examples
 

@@ -73,7 +73,7 @@ impl Stack {
         // Set the stack value
         self.stack[self.pointer] = value;
 
-        // Incerment stack pointer
+        // Increment stack pointer
         self.pointer += 1;
     }
 
@@ -82,15 +82,28 @@ impl Stack {
         self.pointer
     }
 
+    ///
     pub fn types(&self) -> Vec<ValueType> {
         let stack_types = &self.stack[..self.pointer];
         stack_types.iter().map(|x| x.clone().into()).collect()
     }
 
     ///
+    pub fn values(&self) -> Vec<StackValue> {
+        self.stack[..self.pointer].to_vec()
+    }
+
+    ///
     pub fn check_types(&self, types: &[ValueType]) -> bool {
         let stack_types = self.types();
         stack_types == types
+    }
+
+    ///
+    pub fn push_values(&mut self, values: Vec<StackValue>) {
+        for val in values {
+            self.push(val)
+        }
     }
 }
 

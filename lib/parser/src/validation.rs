@@ -1,9 +1,9 @@
 use crate::{
     errors::ParserError,
+    ir::{FuncSignature, BlockType},
     kinds::ErrorKind,
     parser::{Parser, ParserResult},
     ValueType::{self, *},
-    ir::FuncSignature,
 };
 
 // TODO: MAKE THESE VALIDATIONS AN IMPL OF
@@ -118,14 +118,17 @@ impl<'a> Parser<'a> {
                 kind: ErrorKind::MismatchedOperandTypes {
                     expected: expected_types.to_vec(),
                     found: stack_types,
-                }
+                },
             });
         }
         Ok(())
     }
 
     ///
-    pub fn validate_function_return_signature(&self, expected_signature: FuncSignature) -> ParserResult<()> {
+    pub fn validate_function_return_signature(
+        &self,
+        expected_signature: FuncSignature,
+    ) -> ParserResult<()> {
         let cursor = self.cursor;
 
         if !self.stack.check_types(&expected_signature.returns) {
@@ -136,15 +139,41 @@ impl<'a> Parser<'a> {
                 kind: ErrorKind::MismatchedFunctionReturnSignature {
                     expected: expected_signature,
                     return_type_found: stack_types,
-                }
+                },
             });
         }
         Ok(())
     }
+
+    ///
+    pub fn validate_block_result_signature(&self, block_type_id: i8) -> ParserResult<()> {
+        let cursor = self.cursor;
+        let stack_types = self.stack.types();
+
+        match block_type_id {
+            -0x04...-0x01 => {
+                let ty = ValueType::from(block_type_id);
+                if self.stack.check_types(&[ty]) {
+                    return Ok(());
+                }
+            }
+            -0x40 => {
+                if stack_types == &[] {
+                    return Ok(());
+                }
+            }
+            _ => {}
+        }
+
+        Err(ParserError {
+            cursor,
+            kind: ErrorKind::MismatchedBlockResultSignature {
+                expected: vec![BlockType::from(block_type_id)],
+                found: stack_types,
+            },
+        })
+    }
 }
-
-
-
 
 // LIST
 // mem operations Alignment= power df two, not more than 4

@@ -28,9 +28,12 @@ pub struct Parser<'a> {
     pub(crate) sections_consumed: Vec<u8>, // Holds the section ids that have been consumed. Section types cannot occur more than once.
     pub(crate) stack: Stack,
     pub(crate) operator_index: usize,
+    pub(crate) label_depth: usize,
 }
 
 /// Contains the implementation of parser
+/// TODO: Validation
+/// - payload len
 impl<'a> Parser<'a> {
     /// Creates new parser
     pub fn new(code: &'a [u8]) -> Self {
@@ -40,6 +43,7 @@ impl<'a> Parser<'a> {
             sections_consumed: vec![],
             stack: Stack::new(),
             operator_index: 0,
+            label_depth: 0,
         }
     }
 
@@ -1025,6 +1029,8 @@ impl<'a> Parser<'a> {
         // Consume instructions
         let instructions = self.instructions(sections, None)?;
 
+        self.reset_instructions_state();
+
         Ok(Global {
             content_type,
             mutability,
@@ -1124,6 +1130,8 @@ impl<'a> Parser<'a> {
         // Consume code.
         let instructions = self.instructions(sections, None)?;
 
+        self.reset_instructions_state();
+
         // Get count of function indices.
         let func_count = get_value!(
             self.varuint32(),
@@ -1207,12 +1215,10 @@ impl<'a> Parser<'a> {
         //
         debug!("Signature = {:#?}", signature);
 
-        // Check if return signature matches stack type
+        // Validate return signature matches stack type
         self.validate_function_return_signature(signature.clone())?;
 
-        // Reset stack and operator_index
-        self.stack = Stack::new();
-        self.operator_index = 0;
+        self.reset_instructions_state();
 
         Ok(Function {
             locals,
@@ -1275,10 +1281,10 @@ impl<'a> Parser<'a> {
 
             operators.push(self.operator(opcode, sections, locals)?);
 
-            debug!("Stack = {:?}\n", self.stack);
-
             // Increment operator_index
             self.operator_index += 1;
+
+            debug!("Stack = {:?}\n", self.stack);
         }
 
         debug!("Operators = {:?}\n", operators);
@@ -1294,14 +1300,14 @@ impl<'a> Parser<'a> {
         // Blocks and functions return some type so the stack can't contain values
         // more than the block return types at the time of block exit.
         let operation = match opcode {
-            // CONTROL FLOW // TODO: Update stack
-            0x00 => Operator::Unreachable, // TODO: Update stack
-            0x01 => Operator::Nop, // TODO: Update stack
-            0x02 => unimplemented!(),
+            // CONTROL FLOW
+            0x00 => Operator::Unreachable,
+            0x01 => Operator::Nop,
+            0x02 => self.operator_block(sections, locals)?,
             0x03 => unimplemented!(),
             0x04 => unimplemented!(),
             0x05 => unimplemented!(),
-            0x0b => Operator::End, // TODO: Update stack
+            0x0b => Operator::End,
             0x0c => unimplemented!(),
             0x0d => unimplemented!(),
             0x0e => unimplemented!(),
@@ -1310,8 +1316,8 @@ impl<'a> Parser<'a> {
             0x10 => unimplemented!(),
             0x11 => unimplemented!(),
             // PARAMETRIC
-            0x1A => unimplemented!(),
-            0x1B => unimplemented!(),
+            0x1A => self.operator_drop()?,
+            0x1B => unimplemented!(), // The only ternary operator
             // VARIABLE ACCESS
             0x20 => self.operator_local_get(locals)?,
             0x21 => self.operator_local_set(locals)?,
@@ -1643,10 +1649,9 @@ impl<'a> Parser<'a> {
         let value = self.varint7()?;
 
         // i32, i64, f32, f64
-        if value == -0x01 || value == -0x02 || value == -0x03 || value == -0x04 {
-            Ok(value as _)
-        } else {
-            Err(ErrorKind::InvalidValueType)
+        match value {
+            -0x04...-0x01 => Ok(value),
+            _ => Err(ErrorKind::InvalidValueType),
         }
     }
 
@@ -1665,6 +1670,13 @@ impl<'a> Parser<'a> {
     }
 
     /******** UTILS ********/
+
+    ///
+    pub fn reset_instructions_state(&mut self) {
+        // Reset stack and operator_index
+        self.stack = Stack::new();
+        self.operator_index = 0;
+    }
 
     /// TODO: TEST
     pub fn skip_to_section(&mut self, section_id: u8) -> ParserResult<()> {

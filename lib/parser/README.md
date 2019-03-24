@@ -510,6 +510,11 @@ end         | byte [0x0b]
         f32.reinterpret_i32 | 0xbe  |
         f64.reinterpret_i64 | 0xbf  |
 
+    - SIMD
+
+    - ATOMICS
+
+
 
 ### DATA SECTION
 fields      | type
