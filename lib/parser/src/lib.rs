@@ -6,7 +6,7 @@ mod kinds;
 mod parser;
 mod stack;
 mod validation;
-mod operator;
+mod operators;
 
 pub use errors::ParserError;
 pub use ir::{ExportDesc, Function, Global, Import, Type, ValueType, ImportDesc, Local, Memory, Module, Operator, Section, Table};

@@ -7,13 +7,9 @@ use crate::{
     kinds::{ErrorKind, SectionKind},
     stack::Stack,
 };
-use std::collections::LinkedList;
 use std::str;
 use wasmlite_utils::{debug, verbose};
 use hashbrown::HashMap;
-
-// TODO
-//  - Improve error reporting.
 
 pub type ParserResult<T> = Result<T, ParserError>;
 
@@ -45,11 +41,6 @@ impl<'a> Parser<'a> {
             operator_index: 0,
             label_depth: 0,
         }
-    }
-
-    /// Sets the parser's cursor.
-    pub(super) fn set_cursor(&mut self, cursor: usize) {
-        self.cursor = cursor;
     }
 
     /// Pushes an id into the parser's sections_consumed.

@@ -6,8 +6,7 @@ use crate::{
     ValueType::{self, *},
 };
 
-// TODO: MAKE THESE VALIDATIONS AN IMPL OF
-
+///
 impl<'a> Parser<'a> {
     /// Implementation based on Unicode Standard 11.0, Section 3.9, Table 3-7.
     // TODO: TEST THOROUGHLY!! (Codepoints, Grapheme Clusters, etc.)
@@ -176,4 +175,4 @@ impl<'a> Parser<'a> {
 }
 
 // LIST
-// mem operations Alignment= power df two, not more than 4
+// mem operations Alignment= power of two, not more than 4

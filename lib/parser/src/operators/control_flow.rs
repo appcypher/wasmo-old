@@ -24,7 +24,7 @@ impl<'a> Parser<'a> {
 
         debug!("== ENTER Block");
 
-        let block_type_id = get_value!(
+        let type_id = get_value!(
             self.varint7(),
             cursor,
             IncompleteExpression,
@@ -35,7 +35,7 @@ impl<'a> Parser<'a> {
         let operators = self.instructions(sections, locals)?;
 
         // Validate block result signature matches stack types
-        self.validate_block_result_signature(block_type_id)?;
+        self.validate_block_result_signature(type_id)?;
 
         debug!("== LEAVE Block");
 
@@ -47,7 +47,7 @@ impl<'a> Parser<'a> {
         self.operator_index = old_operator_index;
 
         // Push value to stack
-        if let BlockType::Type(ty) = BlockType::from(block_type_id) {
+        if let BlockType::Type(ty) = BlockType::from(type_id) {
             self.stack.push(StackValue::new(ty, self.operator_index));
         }
 

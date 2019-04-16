@@ -673,7 +673,7 @@ pub fn valid_block() -> Vec<u8> {
     ]
 }
 
-pub fn valid_block_additional_stack_values() -> Vec<u8> {
+pub fn valid_block_old_value_new_block_value() -> Vec<u8> {
     vec![
         0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00, // PREAMBLE
         //=======================

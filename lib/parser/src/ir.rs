@@ -255,13 +255,12 @@ pub enum ExportDesc {
 ///
 #[derive(Debug, Clone, PartialEq)]
 pub enum Operator {
+    // ------------------ CONTROL FLOW ------------------ //
+
     End,
     Nop,
     Unreachable,
 
-
-
-    // CONTROL FLOW
     // (instructions: Instr) -> I32
     Block(Vec<Operator>),
     // (cond: I32, f: Instr, else: Instr) -> I32
@@ -273,13 +272,15 @@ pub enum Operator {
     // (cond: I32, label: I32, )
     BrTable(usize),
 
-    // PARAMETRIC
+    // ------------------ PARAMETRIC ------------------ //
+
     // (value: T)
     Drop,
     // (cond: I32, lhs: T, rhs: T) -> T
     Select(),
 
-    // VARIABLE ACCESS
+    // ------------------ VARIABLE ACCESS ------------------ //
+
     // (local_index: Imm) -> T
     LocalGet(u32),
     // (local_index: Imm, value: T)
@@ -292,7 +293,8 @@ pub enum Operator {
     // (global_index: Imm, value: T)
     GlobalSet(u32, usize),
 
-    // MEMORY
+    // ------------------ MEMORY ------------------ //
+
     // (align: Imm, offset: Imm, base: I32) -> T
     I32Load(u32, u32, usize),
     I64Load(u32, u32, usize),
@@ -334,14 +336,16 @@ pub enum Operator {
     // () -> I32
     MemorySize,
 
-    // CONSTANT
+    // ------------------ CONSTANT ------------------ //
+
     // (value: Imm)
     I32Const(i32),
     I64Const(i64),
     F32Const(f32),
     F64Const(f64),
 
-    // COMPARISONS
+    // ------------------ COMPARISONS ------------------ //
+
     // (value: T) -> I32
     I32Eqz(usize),
     I64Eqz(usize),
@@ -393,7 +397,8 @@ pub enum Operator {
     F32Ge(usize, usize),
     F64Ge(usize, usize),
 
-    // NUMERIC
+    // ------------------ NUMERIC ------------------ //
+
     // (value: T) -> T
     I32Clz(usize),
     I64Clz(usize),
@@ -490,7 +495,8 @@ pub enum Operator {
     F32Sqrt(usize),
     F64Sqrt(usize),
 
-    // CONVERSIONS
+    // ------------------ CONVERSIONS ------------------ //
+
     // (value: T) -> U
     I32WrapI64(usize),
 
@@ -525,7 +531,8 @@ pub enum Operator {
 
     F64PromoteF32(usize),
 
-    // REINTERPRETATIONS
+    // ------------------ REINTERPRETATIONS ------------------ //
+
     // (value: T) -> U
     I32ReinterpretF32(usize),
     I64ReinterpretF64(usize),
