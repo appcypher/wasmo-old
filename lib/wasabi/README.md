@@ -1,5 +1,5 @@
 ### DESCRIPTION
-Wasabi is basically a project that wraps the Clang/musl toolchain. And it is Linux-based.
+Wasabi is basically a project that wraps the Clang/musl toolchain. And it is Linux-based. I like to call the ABI wasabi support as `wasm32-llvm-linux`.
 
 ### PORTABILITY ISSUE
 It's somewhat easy to reimplement the following syscalls for BSD-like operating systems, but some form of emulation is needed for Windows support.
