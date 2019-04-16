@@ -143,13 +143,6 @@ let result = main.call(1, 2);
 
 -------------------------------------------------------------------
 
-
-## CACHING
-* Module caching (serde and llvm.Module serialization to bitcode)
-* Object file and dylib creation
-
--------------------------------------------------------------------
-
 ## THREADS
 * ...
 
