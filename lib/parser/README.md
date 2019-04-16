@@ -6,9 +6,7 @@ _Resources for learning more about wasm binary:_
 - https://github.com/sunfishcode/wasm-reference-manual/blob/master/WebAssembly.md
 
 ### THE WASM SPEC
-The [binary encoding document](https://github.com/WebAssembly/design/blob/master/BinaryEncoding.md) on wasm design repo is no longer maintained, the spec is supposed to be the source of truth but I was a bit skeptical about it at first because I didn't find the details I needed in time and I was confused by the statement "[all integers are encoded using the LEB128  variable-length integer encoding, in either unsigned or signed variant](https://webassembly.github.io/spec/core/binary/values.html#integers)". The binary doc had mentioned things like `uint8, uint16 and uint32`, but those were not mentioned anywhere in the spec. I later came across the [byte section](https://webassembly.github.io/spec/core/binary/values.html#bytes) and that was the `uint8, uint16 and uint32` I was looking for.
-
-I have an issue with some aspects of wasm space and one of it is that `code section` contains `function_bodies` and thes `function_bodies` start with a varuint32 `body_size` which signifies the entire length of the body. The instructions included. However for global, data and element sections, the entries don't start with a `body_size` representing the length of the enire entry. So to know the end of the instruction section, you have to reach an `end_byte`. Alright, but the instructions should have been placed last in the entry so that one can get other relevant information about an entry.
+The [binary encoding document](https://github.com/WebAssembly/design/blob/master/BinaryEncoding.md) on wasm design repo is no longer maintained, the spec is supposed to be the source of truth .
 
 ### TODO
 - [ ] Finish instruction parsing
