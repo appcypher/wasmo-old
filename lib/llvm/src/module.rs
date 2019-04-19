@@ -13,7 +13,7 @@ use llvm_sys::execution_engine::{
 
 use llvm_sys::prelude::{LLVMContextRef, LLVMModuleRef};
 
-use wasmlite_utils::debug;
+use wasmo_utils::debug;
 
 use super::{
     string::to_rust_string,

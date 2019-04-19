@@ -4,7 +4,7 @@ use crate::{
     stack::StackValue,
     ValueType::{self, *},
 };
-use wasmlite_utils::verbose;
+use wasmo_utils::verbose;
 
 // Extends Parser implementation
 impl<'a> Parser<'a> {

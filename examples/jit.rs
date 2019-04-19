@@ -1,10 +1,10 @@
 //! USAGE: cargo run --example jit --features "verbose"
 
-use wasmlite_utils::debug;
+use wasmo_utils::debug;
 
-use wasmlite_parser::ir;
+use wasmo_parser::ir;
 
-use wasmlite_llvm::{
+use wasmo_llvm::{
     types::{fn_type, BasicType},
     values::IntValue, CompilerResult,
     Builder, Context, Module, OptimizationLevel, ExecutionEngine, Func

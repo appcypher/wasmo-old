@@ -1,4 +1,4 @@
-use wasmlite_runtime::{
+use wasmo_runtime::{
     Imports
 };
 

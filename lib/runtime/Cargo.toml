@@ -1,22 +1,22 @@
 [package]
-name = "wasmlite-runtime"
+name = "wasmo-runtime"
 version = "0.0.1"
 authors = ["Steve Akinyemi <appcypher@outlook.com>"]
 edition = "2018"
 #-----------------------------------------
-description = "wasmlite runtime component"
+description = "wasmo runtime component"
 readme = "README.md"
-repository = "https://github.com/appcypher/wasmlite"
+repository = "https://github.com/appcypher/wasmo"
 keywords = ["compiler", "webassembly", "vm", "runtime", "llvm"]
 categories = ["development-tools", "parser-implementations", "wasm"]
-documentation = "https://github.com/appcypher/wasmlite"
-homepage = "https://github.com/appcypher/wasmlite"
+documentation = "https://github.com/appcypher/wasmo"
+homepage = "https://github.com/appcypher/wasmo"
 license = "Apache-2.0"
 
 [dependencies]
-wasmlite-llvm = { path = "../llvm" }
-wasmlite-utils = { path = "../utils" }
-wasmlite-parser = { path = "../parser" }
+wasmo-llvm = { path = "../llvm" }
+wasmo-utils = { path = "../utils" }
+wasmo-parser = { path = "../parser" }
 libc = "0.2.49"
 
 [features]

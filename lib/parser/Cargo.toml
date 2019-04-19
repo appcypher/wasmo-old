@@ -1,5 +1,5 @@
 [package]
-name = "wasmlite-parser"
+name = "wasmo-parser"
 version = "0.0.1"
 authors = ["Steve Akinyemi <appcypher@outlook.com>"]
 license = "Apache-2.0"
@@ -7,14 +7,14 @@ edition = "2018"
 #-----------------------------------------
 description = "This crate parses WebAssembly modules and can generate LLVM IR based the data extracted from a module"
 readme = "../../README.md"
-repository = "https://github.com/appcypher/wasmlite"
+repository = "https://github.com/appcypher/wasmo"
 keywords = ["compiler", "webassembly", "wasm", "parser", "llvm"]
 categories = ["development-tools", "parser-implementations", "wasm"]
-documentation = "https://github.com/appcypher/wasmlite"
-homepage = "https://github.com/appcypher/wasmlite"
+documentation = "https://github.com/appcypher/wasmo"
+homepage = "https://github.com/appcypher/wasmo"
 
 [dependencies]
-wasmlite-utils = { path = "../utils" }
+wasmo-utils = { path = "../utils" }
 hashbrown = "0.1.8"
 
 [features]

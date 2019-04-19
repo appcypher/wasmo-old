@@ -6,7 +6,7 @@ Experimenting! Random notes on speculative ideas.
 - Generating an executable from a wasm file.
 
     ```bash
-    wasmlite server.wasm -o server.out
+    wasmo server.wasm -o server.out
     ```
 
     This command should generate the following files:
@@ -14,7 +14,7 @@ Experimenting! Random notes on speculative ideas.
     * libwasabi.dylib (if wasabi is specified)
 
     ```bash
-    wasmlite server.wasm -c libserver.a
+    wasmo server.wasm -c libserver.a
     ```
 
     This command should generate a static library that can be linked against.
@@ -24,14 +24,14 @@ Experimenting! Random notes on speculative ideas.
     https://github.com/WebAssembly/tool-conventions/blob/master/Linking.md
 
     ```bash
-    wasmlite server.wasm --mode=lazy
+    wasmo server.wasm --mode=lazy
     ```
 
 #### SELECTING ABI
 - Running a wasm file with the wasabi (llvm/wasm32) abi.
 
     ```bash
-    wasmlite server.wasm --abi=wasabi
+    wasmo server.wasm --abi=wasabi
     ```
 
     The emscripten abi is the default (?).
@@ -40,20 +40,20 @@ Experimenting! Random notes on speculative ideas.
 - Passing arguments to a wasm application
 
     ```bash
-    wasmlite server.wasm -- 8080
+    wasmo server.wasm -- 8080
     ```
 
 #### PERMISSIONS
 - Setting the permissions a wasm application can have
 
     ```bash
-    wasmlite server.wasm --perms=no-port,no-file
+    wasmo server.wasm --perms=no-port,no-file
     ```
 
 - Checking a wasm application permissions
 
     ```bash
-    wasmlite server.wasm --perms
+    wasmo server.wasm --perms
     ```
 
 ### INSTALLATION
@@ -65,4 +65,4 @@ Experimenting! Random notes on speculative ideas.
     ```
 
 - Windows
-    - Download appropriate binary from [wasmlab.io/downloads/wasmlite](https://www.wasmlab.io/downloads/wasmlite)
+    - Download appropriate binary from [wasmlab.io/downloads/wasmo](https://www.wasmlab.io/downloads/wasmo)

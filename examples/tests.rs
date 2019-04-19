@@ -1,5 +1,5 @@
-use wasmlite_parser::Parser;
-use wasmlite_utils::{debug, verbose};
+use wasmo_parser::Parser;
+use wasmo_utils::{debug, verbose};
 
 mod test_samples;
 

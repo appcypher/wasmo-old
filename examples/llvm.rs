@@ -2,9 +2,9 @@
 
 mod utils;
 
-use wasmlite_utils::{verbose, debug, file::wat2wasm};
-use wasmlite_llvm::codegen;
-use wasmlite_parser::Parser;
+use wasmo_utils::{verbose, debug, file::wat2wasm};
+use wasmo_llvm::codegen;
+use wasmo_parser::Parser;
 use utils::project_path;
 
 fn main() {

@@ -10,7 +10,7 @@ use llvm_sys::core::{
 
 use llvm_sys::prelude::{LLVMContextRef, LLVMTypeRef};
 
-use wasmlite_utils::debug;
+use wasmo_utils::debug;
 
 use crate::{
     types::{FloatType, IntType},

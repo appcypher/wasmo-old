@@ -1,5 +1,5 @@
-use wasmlite_llvm as llvm;
-use wasmlite_parser::ir;
+use wasmo_llvm as llvm;
+use wasmo_parser::ir;
 
 use crate::ModuleDesc;
 

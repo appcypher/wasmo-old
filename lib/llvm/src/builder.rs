@@ -9,7 +9,7 @@ use llvm_sys::core::{
     LLVMPositionBuilder, LLVMPositionBuilderAtEnd, LLVMPositionBuilderBefore,
 };
 
-use wasmlite_utils::debug;
+use wasmo_utils::debug;
 
 use crate::{BasicBlock, Context};
 

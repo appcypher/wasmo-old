@@ -1,5 +1,5 @@
 [package]
-name = "wasmlite-codegen"
+name = "wasmo-codegen"
 version = "0.0.1"
 authors = ["Steve Akinyemi <appcypher@outlook.com>"]
 license = "Apache-2.0"
@@ -7,14 +7,14 @@ edition = "2018"
 #-----------------------------------------
 description = "This crate generates LLVM module from a WebAssembly module"
 readme = "../../README.md"
-repository = "https://github.com/appcypher/wasmlite"
+repository = "https://github.com/appcypher/wasmo"
 keywords = ["compiler", "webassembly", "vm", "runtime", "llvm"]
 categories = ["development-tools", "parser-implementations", "wasm"]
-documentation = "https://github.com/appcypher/wasmlite"
-homepage = "https://github.com/appcypher/wasmlite"
+documentation = "https://github.com/appcypher/wasmo"
+homepage = "https://github.com/appcypher/wasmo"
 
 [dependencies]
 llvm-sys = "60"
-wasmlite-llvm = { path = "../llvm" }
-wasmlite-parser = { path = "../parser" }
-wasmlite-utils = { path = "../utils" }
+wasmo-llvm = { path = "../llvm" }
+wasmo-parser = { path = "../parser" }
+wasmo-utils = { path = "../utils" }

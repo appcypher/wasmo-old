@@ -309,34 +309,34 @@ dependencies = [
 ]
 
 [[package]]
-name = "wasmlite"
+name = "wasmo"
 version = "0.0.1"
 dependencies = [
  "dotenv 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "wasmlite-llvm 0.0.1",
- "wasmlite-parser 0.0.1",
- "wasmlite-utils 0.0.1",
+ "wasmo-llvm 0.0.1",
+ "wasmo-parser 0.0.1",
+ "wasmo-utils 0.0.1",
 ]
 
 [[package]]
-name = "wasmlite-llvm"
+name = "wasmo-llvm"
 version = "0.0.1"
 dependencies = [
  "llvm-sys 60.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "wasmlite-parser 0.0.1",
- "wasmlite-utils 0.0.1",
+ "wasmo-parser 0.0.1",
+ "wasmo-utils 0.0.1",
 ]
 
 [[package]]
-name = "wasmlite-parser"
+name = "wasmo-parser"
 version = "0.0.1"
 dependencies = [
  "hashbrown 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
- "wasmlite-utils 0.0.1",
+ "wasmo-utils 0.0.1",
 ]
 
 [[package]]
-name = "wasmlite-utils"
+name = "wasmo-utils"
 version = "0.0.1"
 dependencies = [
  "wabt 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",

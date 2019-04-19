@@ -1,8 +1,8 @@
 mod utils;
 
 use utils::project_path;
-use wasmlite_parser::Parser;
-use wasmlite_utils::{debug, file::wat2wasm, verbose};
+use wasmo_parser::Parser;
+use wasmo_utils::{debug, file::wat2wasm, verbose};
 
 fn main() {
     // Convert wat file to wasm bytes.

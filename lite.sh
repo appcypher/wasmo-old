@@ -44,7 +44,7 @@ help() {
     echo ""
     echo " =========================== lite ==============================="
     echo "|                                                                |"
-    echo "|     A simple utility for managing wasmlite installs            |"
+    echo "|     A simple utility for managing wasmo installs            |"
     echo "|                                                                |"
     echo "| [USAGE] : lite [comand]                                        |"
     echo "| [COMMAND] :                                                    |"
@@ -56,17 +56,17 @@ help() {
     echo ""
 }
 
-# TODO: Debug install (wasmlited) vs release install (wasmlite)
+# TODO: Debug install (wasmod) vs release install (wasmo)
 # DESCRIPTION:
-#	Installs wasmlite project
+#	Installs wasmo project
 install() {
-    local wasmlite_path="$script_dir/target/debug/wasmlite"
+    local wasmo_path="$script_dir/target/debug/wasmo"
     local usr_prefix="/usr/local/bin"
 
     #--------------------------------------------------
 
     # TODO: Seperate release build.
-    displayln "Build wasmlite project"
+    displayln "Build wasmo project"
     # Build cargo project.
     LLVM_SYS_60_PREFIX=$1 cargo build --feature "verbose"
 
@@ -77,8 +77,8 @@ install() {
     chmod u+x $script_path
 
     # Add links to commands in /usr/local/bin
-    if [ ! -f "$usr_prefix/wasmlite" ]; then
-        add_link "wasmlite" $wasmlite_path
+    if [ ! -f "$usr_prefix/wasmo" ]; then
+        add_link "wasmo" $wasmo_path
     fi
 
     if [ ! -f "$usr_prefix/lite" ]; then
@@ -88,9 +88,9 @@ install() {
 
 # TODO: Refactor
 # DESCRIPTION:
-#	Uninstalls wasmlite project
+#	Uninstalls wasmo project
 uninstall() {
-    if confirm "uninstall wasmlite"; then
+    if confirm "uninstall wasmo"; then
         echo "Exiting"
         exit 0
     fi
@@ -100,7 +100,7 @@ uninstall() {
     #--------------------------------------------------
 
     displayln "Remove commands"
-    remove_link "wasmlite"
+    remove_link "wasmo"
     remove_link "lite"
 }
 

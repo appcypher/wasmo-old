@@ -8,7 +8,7 @@ use crate::{
     stack::Stack,
 };
 use std::str;
-use wasmlite_utils::{debug, verbose};
+use wasmo_utils::{debug, verbose};
 use hashbrown::HashMap;
 
 pub type ParserResult<T> = Result<T, ParserError>;

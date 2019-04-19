@@ -1,9 +1,9 @@
 use std::env;
 
-use wasmlite_utils::verbose;
+use wasmo_utils::verbose;
 
 fn main() {
-    println!("\n=== [ wasmlite ] ===\n");
+    println!("\n=== [ wasmo ] ===\n");
 
     println!("|                   |");
     println!("|    STAY TUNED!    |");
@@ -22,5 +22,5 @@ fn main() {
 
     verbose!("args = {:#?}\n", args);
 
-    println!("\n=== [ wasmlite ] ===\n");
+    println!("\n=== [ wasmo ] ===\n");
 }

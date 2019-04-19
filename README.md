@@ -1,10 +1,10 @@
 
-# WASMLITE
+# WASMO
 This project aims to provide the necessary tools for compiling wasm binary to LLVM IR which can further be compiled to machine-specific code.
 
 This project is supposed to make it easy for languages compiling to wasm to take advantage of the LLVM infrastructure.
 
-It also allows stripping of expensive wasm runtime elements for times when full wasm specification is not desired.
+It also allows stripping of expensive wasm runtime elements for times when complete specification compliance is not desired.
 
 Lastly, it is a platform for learning about WebAssembly, LLVM and how they play well together, therefore it is designed to be approachable. Documentation is very important.
 
@@ -14,10 +14,10 @@ Lastly, it is a platform for learning about WebAssembly, LLVM and how they play 
 - Clone the repository.
 
     ```bash
-    git clone https://github.com/appcypher/wasmlite.git
+    git clone https://github.com/appcypher/wasmo.git
     ```
 
-- Wasmlite is a [Rust](https://www.rust-lang.org) project so it depends on `rustc` and `cargo`. You can install them with the following:
+- Wasmo is a [Rust](https://www.rust-lang.org) project so it depends on `rustc` and `cargo`. You can install them with the following:
 
     ```bash
     curl https://sh.rustup.rs -sSf | sh
@@ -29,7 +29,7 @@ Lastly, it is a platform for learning about WebAssembly, LLVM and how they play 
 - Build the project.
 
     ```bash
-    cd wasmlite
+    cd wasmo
     ```
 
     ```bash
@@ -37,8 +37,8 @@ Lastly, it is a platform for learning about WebAssembly, LLVM and how they play 
     ```
 
     This command does the following:
-    - builds the `wasmlite` project.
-    - installs necessary commands like `wasmlite`, and `lite`.
+    - builds the `wasmo` project.
+    - installs necessary commands like `wasmo`, and `lite`.
 
 - After a successful install you should be able to use the `lite.sh` script via the `lite` command.
 
@@ -46,20 +46,20 @@ Lastly, it is a platform for learning about WebAssembly, LLVM and how they play 
     lite --help
     ```
 
-- You can also use `wasmlite` command now.
+- You can also use `wasmo` command now.
 
     ```bash
-    wasmlite --help
+    wasmo --help
     ```
 
 #### Windows
 - Clone the repository.
 
     ```bash
-    git clone https://github.com/appcypher/wasmlite.git
+    git clone https://github.com/appcypher/wasmo.git
     ```
 
-- Wasmlite is a [Rust](https://www.rust-lang.org) project so it depends on `rustc` and `cargo`. You can install Rust here with the following:
+- Wasmo is a [Rust](https://www.rust-lang.org) project so it depends on `rustc` and `cargo`. You can install Rust here with the following:
     - Navigate to the `stable` section.
     - Download the `.msi` binary under `x86_64-pc-windows-gnu` if you are mostly working from mingw-based apps (Cygwin, MSYS2) or Window Subsytem for Linux.
     - Download the `.msi` binary under `x86_64-pc-windows-msvc` if you are mostly working from Visual Studio or used to Microsoft tools.
@@ -72,7 +72,7 @@ Lastly, it is a platform for learning about WebAssembly, LLVM and how they play 
 - Build the project.
 
     ```bash
-    cd wasmlite
+    cd wasmo
     ```
 
     - `lite.bat` is still in works, but for now
@@ -82,10 +82,10 @@ Lastly, it is a platform for learning about WebAssembly, LLVM and how they play 
     LLVM_SYS_60_PREFIX=path/to/llvm cargo build --feature "verbose"
     ```
 
-- You can run `wasmlite` binary now.
+- You can run `wasmo` binary now.
 
     ```bash
-    ./target/debug/wasmlite --help
+    ./target/debug/wasmo --help
     ```
 
 
@@ -100,7 +100,7 @@ Lastly, it is a platform for learning about WebAssembly, LLVM and how they play 
 ### USAGE (Highly Experimental!)
 - Run wasm file in examples directory
     ```bash
-    wasmlite examples/wasm/.wasm
+    wasmo examples/wasm/.wasm
     ```
 
 ### API (Susceptible to Change!)
@@ -183,10 +183,10 @@ main.call(5, wasm_array);
 ###
 
 ### ATTRIBUTIONS
-These are the nice projects `wasmlite` references for its design
+These are the nice projects `wasmo` references for its design
 - [inkwell](https://github.com/TheDan64/inkwell) [Apache-2.0] - the LLVM wrapper section is inspired by this awesome project that gives [llvm-sys](https://bitbucket.org/tari/llvm-sys.rs) a type-safe interface.
-- [wasmer](https://github.com/wasmerio/wasmer) [MIT] - wasmlite takes some architectural cues taken from wasmer, a WebAssembly runtime with cross-platform portability in mind.
-- [wasmtime](https://github.com/CraneStation/wasmtime) [Apache-2.0] - wasmlite also borrows some ideas from this wasmtime a Cranelift-based Webassembly runtime.
+- [wasmer](https://github.com/wasmerio/wasmer) [MIT] - wasmo takes some architectural cues taken from wasmer, a WebAssembly runtime with cross-platform portability in mind.
+- [wasmtime](https://github.com/CraneStation/wasmtime) [Apache-2.0] - wasmo also borrows some ideas from this wasmtime a Cranelift-based Webassembly runtime.
 
 If you are interested in this project, you should probably check out [WAVM](https://github.com/WAVM/WAVM) as well.
 In fact, you need to see [these other webassembly runtimes](https://github.com/appcypher/awesome-wasm-runtimes), they are all interesting projects.

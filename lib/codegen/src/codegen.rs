@@ -1,4 +1,4 @@
-use wasmlite_parser::ir;
+use wasmo_parser::ir;
 use crate::Module;
 
 pub fn generate_module(wasm_module: &ir::Module) -> Module {

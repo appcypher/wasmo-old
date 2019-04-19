@@ -1,4 +1,4 @@
-#![deprecated(since="0.0.1", note="wasmlite will transition to ORC APIs")]
+#![deprecated(since="0.0.1", note="wasmo will transition to ORC APIs")]
 
 use std::rc::Rc;
 
@@ -12,7 +12,7 @@ use llvm_sys::execution_engine::{
     LLVMFindFunction, LLVMGetFunctionAddress, LLVMLinkInInterpreter, LLVMLinkInMCJIT,
 };
 
-use wasmlite_utils::debug;
+use wasmo_utils::debug;
 
 use crate::{
     errors::FunctionLookUp, values::FunctionValue, CompilerError, CompilerResult, Context, Module,

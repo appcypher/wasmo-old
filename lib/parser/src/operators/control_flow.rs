@@ -6,7 +6,7 @@ use crate::{
     stack::{StackValue, Stack},
     ValueType::{self, *},
 };
-use wasmlite_utils::debug;
+use wasmo_utils::debug;
 use hashbrown::HashMap;
 
 // Extends Parser implementation
