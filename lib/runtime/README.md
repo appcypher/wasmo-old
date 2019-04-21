@@ -20,7 +20,7 @@ COMPILE:
         * Populate InstanceData with local func addrs
 
     JIT Lazy:
-        * Does nothing. Functions are called on first call
+        * Does nothing. Functions are compiled on first call
 
     AOT:
         * Compiles to code with dynamic calls to external symbols
@@ -47,18 +47,21 @@ INSTANTIATION:
 
 RUNTIME:
 
-    JIT Eager:
-        * On function request through `get_func`, check signature match
-
     JIT Lazy:
-        * Takes in wasm IR, generate llvm code and adds to llvm Module (Lazy REPL)
-        * Tell llvm world which function to compile. Phase is skipped if already compiled
+        * Takes in function request. Check signature match
+        * Tells llvm world which function to compile. Phase is skipped if already compiled
         * Gets addr to symbol
         * Apply external symbols address relocation (ORC's job)
         * Also on function request through `get_func`, check signature match
 
     JIT Eval:
-        * ...
+        * Takes in wasm module
+        * Validate and generates wasm IR
+        * Generates llvm code and adds to llvm Module
+        * Tells llvm world which function to compile. Phase is skipped if already compiled
+        * Gets addr to symbol
+        * Apply external symbols address relocation (ORC's job)
+        * Also on function request through `get_func`, check signature match
 
     PGO:
         * ...

@@ -1,5 +1,13 @@
+<div align="center">
+    <a href="#" target="_blank">
+        <img src="media/wasmo.png" alt="Wasabi Logo" width="140" height="140"></img>
+    </a>
+</div>
 
-# WASMO
+
+<h1 align="center">WASMO</h1>
+
+
 This project aims to provide the necessary tools for compiling wasm binary to LLVM IR which can further be compiled to machine-specific code.
 
 This project is supposed to make it easy for languages compiling to wasm to take advantage of the LLVM infrastructure.
