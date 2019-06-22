@@ -96,7 +96,7 @@ impl Stack {
     ///
     pub fn check_types(&self, types: &[ValueType]) -> bool {
         let stack_types = self.types();
-        stack_types == types
+        &stack_types[..types.len()] == types
     }
 
     ///
