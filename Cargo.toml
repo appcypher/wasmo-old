@@ -14,7 +14,7 @@ homepage = "https://github.com/appcypher/wasmo"
 license = "Apache-2.0"
 
 [dependencies]
-wasmo-parser = { path = "lib/parser" }
+wasmo-codegen = { path = "lib/codegen" }
 wasmo-llvm = { path = "lib/llvm" }
 wasmo-utils = { path = "lib/utils" }
 dotenv = "0.13.0"

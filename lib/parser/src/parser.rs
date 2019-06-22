@@ -1264,8 +1264,8 @@ impl<'a> Parser<'a> {
             verbose!("(instructions::opcode = 0x{:x})", opcode);
 
             // If opcode is an end byte. Break!
-            // We can break because this end byte will always be function end byte
-            // Each operator parser consumes its corresponding end byte
+            // We can break because this end byte will always be function end byte.
+            // Each operator parser consumes its corresponding end byte.
             if opcode == 0x0b {
                 break;
             }
@@ -1296,8 +1296,7 @@ impl<'a> Parser<'a> {
             0x01 => Operator::Nop,
             0x02 => self.operator_block(sections, locals)?,
             0x03 => unimplemented!(),
-            0x04 => unimplemented!(),
-            0x05 => unimplemented!(),
+            0x04 => self.operator_if_else(sections, locals)?, // 0x05 if/else.
             0x0b => Operator::End,
             0x0c => unimplemented!(),
             0x0d => unimplemented!(),

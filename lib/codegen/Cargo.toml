@@ -5,7 +5,7 @@ authors = ["Steve Akinyemi <appcypher@outlook.com>"]
 license = "Apache-2.0"
 edition = "2018"
 #-----------------------------------------
-description = "This crate generates LLVM module from a WebAssembly module"
+description = "This crate generates LLVM module from a WebAssembly binary"
 readme = "../../README.md"
 repository = "https://github.com/appcypher/wasmo"
 keywords = ["compiler", "webassembly", "vm", "runtime", "llvm"]
@@ -14,7 +14,6 @@ documentation = "https://github.com/appcypher/wasmo"
 homepage = "https://github.com/appcypher/wasmo"
 
 [dependencies]
-llvm-sys = "60"
+wasmparser = "0.30.0"
 wasmo-llvm = { path = "../llvm" }
-wasmo-parser = { path = "../parser" }
 wasmo-utils = { path = "../utils" }

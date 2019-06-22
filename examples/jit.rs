@@ -2,12 +2,10 @@
 
 use wasmo_utils::debug;
 
-use wasmo_parser::ir;
-
 use wasmo_llvm::{
     types::{fn_type, BasicType},
     values::IntValue, CompilerResult,
-    Builder, Context, Module, OptimizationLevel, ExecutionEngine, Func
+    Builder, Context, Module, OptimizationLevel, ExecutionEngine, Func,
 };
 
 

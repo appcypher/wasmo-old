@@ -14,6 +14,5 @@ documentation = "https://github.com/appcypher/wasmo"
 homepage = "https://github.com/appcypher/wasmo"
 
 [dependencies]
-llvm-sys = "60"
-wasmo-parser = { path = "../parser" }
+llvm-sys = "70"
 wasmo-utils = { path = "../utils" }

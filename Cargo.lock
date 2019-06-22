@@ -314,7 +314,6 @@ version = "0.0.1"
 dependencies = [
  "dotenv 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "wasmo-llvm 0.0.1",
- "wasmo-parser 0.0.1",
  "wasmo-utils 0.0.1",
 ]
 
