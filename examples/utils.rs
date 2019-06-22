@@ -7,5 +7,5 @@ pub fn project_path(subpath: &str) -> String {
     dotenv::dotenv().ok();
 
     // Append project dir to subpath
-    env::var("project_dir").unwrap() + subpath
+    format!("{}/{}", env::var("project_dir").unwrap(), subpath)
 }
