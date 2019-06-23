@@ -24,17 +24,17 @@ Experimenting! Random notes on speculative ideas.
     https://github.com/WebAssembly/tool-conventions/blob/master/Linking.md
 
     ```bash
-    wasmo server.wasm --mode=lazy
+    wasmo server.wasm --compilation-mode=lazy
+    wasmo server.wasm -cm=lazy
     ```
 
-#### SELECTING ABI
-- Running a wasm file with the wasabi (llvm/wasm32) abi.
+#### SELECTING HOST ENVIRONMENT
+- Running a wasm file with the wasabi (wasm32-linux-llvm) abi.
 
     ```bash
-    wasmo server.wasm --abi=wasabi
+    wasmo server.wasm --host=wasabi
+    wasmo server.wasm -h=wasabi
     ```
-
-    The emscripten abi is the default (?).
 
 #### PASSING ARGUMENTS TO WASM APPLICATION
 - Passing arguments to a wasm application
@@ -44,16 +44,17 @@ Experimenting! Random notes on speculative ideas.
     ```
 
 #### PERMISSIONS
-- Setting the permissions a wasm application can have
-
-    ```bash
-    wasmo server.wasm --perms=no-port,no-file
-    ```
-
 - Checking a wasm application permissions
 
     ```bash
-    wasmo server.wasm --perms
+    wasmo server.wasm --perms -h=wasabi
+    wasmo server.wasm -p -h=wasabi
+    ```
+
+- Setting the permissions a wasm application can have
+
+    ```bash
+    wasmo server.wasm --allow-file="~/Desktop/sample.txt" -h=wasi
     ```
 
 ### INSTALLATION
@@ -66,3 +67,44 @@ Experimenting! Random notes on speculative ideas.
 
 - Windows
     - Download appropriate binary from [wasmlab.io/downloads/wasmo](https://www.wasmlab.io/downloads/wasmo)
+
+### CUSTOM SECTIONS
+- HOST BINDING SECTION
+    - Target triple definition (Cranelift style)
+    - Payload structure
+        ```
+        section_id               - varuint7  = 0
+
+        payload_length           - varuint32
+
+        name_length              - varuint32 = 13
+        name_string              - uint8*    = "host-bindings"
+
+        target_triple_length     - varuint32
+        target_architecture      - uint8
+        target_vendor            - varuint32
+        target_operating_system  - varuint32
+
+        import_count             - varuint32
+        import_index             - varuint32* (field index in import section)
+        ```
+    - The host-binding section can be placed before or after any other section
+    - There can only be one host-binding section in wasm file
+
+- LAZYJIT SECTION
+    > Contains details of functions to be replaced or created as well as the strategy to use if available.
+    - Payload structure
+
+#### COMPILED PYTHON
+
+- Type inference
+- LazyJIT
+
+
+#### DETECT HOST BINDING
+
+- Wasmo shouldn't assume host binding. It has to be specified
+
+```sh
+wasmo examples/print.wasm -h=emscripten
+```

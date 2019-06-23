@@ -29,11 +29,15 @@ pub fn is_wasm_file(filename: &str) -> bool {
     bytes.starts_with(b"\0asm")
 }
 
-pub fn wat2wasm(filepath: &str) -> Vec<u8> {
+pub struct ConversionError {
+    message: &'static str,
+}
+
+pub fn wat2wasm(filepath: &str) -> Result<Vec<u8>, wabt::Error> {
     let mut file = File::open(filepath).expect("Unable to open the file");
     let mut contents = String::new();
     file.read_to_string(&mut contents)
         .expect("Unable to read the file");
 
-    wabt::wat2wasm(contents).unwrap()
+    wabt::wat2wasm(contents)
 }

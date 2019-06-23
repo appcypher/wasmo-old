@@ -1,3 +1,5 @@
+#![deprecated(since="0.0.1", note="wasmo has transitioned to wasmparser")]
+
 use crate::{
     errors::ParserError,
     ir::{

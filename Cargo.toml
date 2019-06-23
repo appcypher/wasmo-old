@@ -20,5 +20,5 @@ wasmo-utils = { path = "lib/utils" }
 dotenv = "0.13.0"
 
 [features]
-debug = []
-verbose = []
+debug = ["wasmo-codegen/debug"]
+verbose = ["wasmo-codegen/verbose", "wasmo-codegen/debug"]

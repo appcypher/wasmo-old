@@ -1,19 +1,33 @@
 //! USAGE: cargo run --example codegen --features "verbose"
-mod utils;
 
+mod utils;
+use wasmo_utils::{file::{read_file_bytes, wat2wasm}, verbose};
 use wasmo_codegen::generate_module;
-use wasmo_utils::read_file_bytes;
 use utils::project_path;
 
 
 fn main() {
     verbose!("\n=== [ codegen_example ] ===\n");
 
-    let wasm_filename = project_path("examples/wat/valid_export_section.wat");
+    let wat_filename = project_path("examples/wat/valid/table-elem.wat");
+    // let wat_filename = project_path("examples/wat/valid/mem-data.wat");
+    // let wat_filename = project_path("examples/wat/valid/mem-table.wat");
+    // let wat_filename = project_path("examples/wat/valid/mem-table-start.wat");
+    // let wat_filename = project_path("examples/wat/invalid/start-parameter.wat");
+    // let wat_filename = project_path("examples/wat/valid/start.wat");
 
-    let wasm_binary = read_file_bytes(wasm_filename.as_str());
+    let wasm_binary = match wat2wasm(wat_filename.as_str()) {
+        Err(error) => panic!("Conversion Error! = {:?}", error),
+        Ok(module) => module,
+    };
 
-    generate_module(&wasm_binary);
+    let module = generate_module(&wasm_binary);
+
+    // Error handing
+    match module {
+        Err(error) => println!("Parsing Error! = {:?}", error),
+        Ok(module) => println!("Compiled module = {:?}", module),
+    }
 
     verbose!("\n=== [ codegen_example ] ===\n");
 }

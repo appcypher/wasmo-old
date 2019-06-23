@@ -17,3 +17,7 @@ homepage = "https://github.com/appcypher/wasmo"
 wasmparser = "0.30.0"
 wasmo-llvm = { path = "../llvm" }
 wasmo-utils = { path = "../utils" }
+
+[features]
+debug = []
+verbose = []

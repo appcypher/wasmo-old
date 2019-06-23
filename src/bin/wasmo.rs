@@ -2,6 +2,8 @@ use std::env;
 
 use wasmo_utils::verbose;
 
+// Use clap for argument parsing.
+
 fn main() {
     println!("\n=== [ wasmo ] ===\n");
 
