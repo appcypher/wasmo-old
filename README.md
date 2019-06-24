@@ -148,21 +148,7 @@ let wasm_array = instance.set_array(&arguments);
 main.call(5, wasm_array);
 ```
 
-### NON_GOAL
-- Have multiple backends
-
 ### CURRENT SUPPORT
-- [ ] Parser
-    - [x] preamble
-    - [x] types
-    - [x] imports
-    - [x] local memories, tables, globals
-    - [x] elems, data, globals
-    - [ ] functions body
-    - [x] exports (functions, tables, globals)
-    - [ ] validation
-    - [ ] exhaustive unit tests and fuzz tests
-
 - [ ] Codegen
     - [ ] basic llvm codegen
     - [ ] basic llvm traps and checks
@@ -170,7 +156,6 @@ main.call(5, wasm_array);
     - [ ] basic memory and table impl
     - [ ] basic table/call_indirect impl
     - [ ] llvm codegen completion
-
 - [ ] Runtime
 - [ ] Compilation Strategies
 - [ ] Compilation Flags
