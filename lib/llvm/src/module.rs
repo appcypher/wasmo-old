@@ -38,7 +38,7 @@ impl Module {
         assert!(!module.is_null());
 
         Self {
-            module: module,
+            module,
             context_ref: context.cloned(), // Increments Context.context ref count
             owned: RefCell::new(false),
         }
@@ -154,13 +154,14 @@ impl Module {
 ///
 impl Drop for Module {
     fn drop(&mut self) {
-        debug!("Module drop!");
-        // Checks if module is owned by a in which case, it will be automatically deallocated
-        // when the ExcecutionEngine is dropped.
+        // NOTE: ExecutionEngine disposes its associated Module.
+        // Dispose Module pointer explicitly if not owned by an ExecutionEngine.
         if !*self.owned.borrow_mut() {
             unsafe {
                 LLVMDisposeModule(self.module);
             }
         }
+
+        debug!("Module drop!");
     }
 }

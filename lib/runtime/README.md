@@ -11,8 +11,16 @@ MODULE —— IMPORTS
     MODULE
 ```
 
+### COMPILATION MODES OVERVIEW
+##### MODES
+- AOT (all at compile-time)
+- JIT Eager (resolution at instantiation)
+- JIT Lazy (llvmir unprocessed)
+- JIT Eval (wasm unprocessed)
+- JIT PGO (machine-code optimization and replacement)
 
-### OVERVIEW
+
+##### STAGES
 COMPILE:
 
     JIT Eager:
@@ -63,8 +71,11 @@ RUNTIME:
         * Apply external symbols address relocation (ORC's job)
         * Also on function request through `get_func`, check signature match
 
-    PGO:
-        * ...
+    JIT PGO:
+        * Optimizes a compiled function using profiling information (initial info from wasm jiteval section)
+        * Gets addr to symbol
+        * Apply external symbols address relocation (ORC's job)
+        * Also on function request through `get_func`, check signature match
 
 
 ### MODULE

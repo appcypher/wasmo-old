@@ -91,14 +91,14 @@ Experimenting! Random notes on speculative ideas.
     - The host-binding section can be placed before or after any other section
     - There can only be one host-binding section in wasm file
 
-- LAZYJIT SECTION
+- JIT SECTION
     > Contains details of functions to be replaced or created as well as the strategy to use if available.
     - Payload structure
 
 #### COMPILED PYTHON
 
 - Type inference
-- LazyJIT
+- JIT
 
 
 #### DETECT HOST BINDING

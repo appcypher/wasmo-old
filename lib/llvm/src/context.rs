@@ -82,6 +82,7 @@ impl Context {
 impl Drop for Context {
     fn drop(&mut self) {
         if Rc::strong_count(&self.context) == 1 {
+            debug!("Context drop!");
             unsafe {
                 LLVMContextDispose(*self.context);
             }
