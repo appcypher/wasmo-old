@@ -74,7 +74,7 @@ Lastly, it is a platform for learning about WebAssembly, LLVM and how they play 
     - This is assuming that the average user will have a 64-bit Intel/AMD CPU, otherwise feel free to install the appropriate binary for your architecture.
     - Set path to installed binaries.
 
-- You need to have `LLVM 6.0.x` installed[¹](#llvm).
+- You need to have `LLVM 8.0.x` installed[¹](#llvm).
     - Check the [known issues](#KNOWN_ISSUE) section for more information.
 
 - Build the project.
@@ -123,7 +123,7 @@ let compiler_flags = Some(CompilerOptions {
         RuntimeProperty::SignatureChecks,
         RuntimeProperty::MemoryBoundsChecks,
     ],
-    strategy: CompilationStrategy::Normal,
+    strategy: CompilationStrategy::JITEager,
 });
 
 // Create wasm options.

@@ -45,6 +45,7 @@ macro_rules! enum_impl_def {
     };
 }
 
+/// ...
 #[macro_export]
 macro_rules! get_type_kind {
     ($field:ident, true) => {

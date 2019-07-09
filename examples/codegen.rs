@@ -25,8 +25,8 @@ fn main() {
 
     // Error handing
     match module {
-        Err(error) => println!("Parsing Error! = {:?}", error),
-        Ok(module) => println!("Compiled module = {:?}", module),
+        Err(error) => panic!("Parsing Error! = {:?}", error),
+        Ok(module) => println!("Module Compiled! = {:?}", module),
     }
 
     verbose!("\n=== [ codegen_example ] ===\n");

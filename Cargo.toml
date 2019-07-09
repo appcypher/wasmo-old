@@ -22,3 +22,7 @@ dotenv = "0.13.0"
 [features]
 debug = ["wasmo-codegen/debug"]
 verbose = ["wasmo-codegen/verbose", "wasmo-codegen/debug"]
+
+[profile.release]
+lto = "fat"
+opt-level = 3

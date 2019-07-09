@@ -8,7 +8,9 @@ use std::ffi::CString;
 use std::marker::PhantomData;
 
 use llvm_sys::execution_engine::{
-    LLVMCreateExecutionEngineForModule, LLVMDisposeExecutionEngine, LLVMExecutionEngineRef,
+    LLVMCreateExecutionEngineForModule,
+    LLVMDisposeExecutionEngine,
+    LLVMExecutionEngineRef,
     LLVMFindFunction, LLVMGetFunctionAddress, LLVMLinkInInterpreter, LLVMLinkInMCJIT,
 };
 
@@ -30,20 +32,21 @@ impl ExecutionEngine {
     pub(crate) fn new(execution_engine: LLVMExecutionEngineRef, jit_mode: bool) -> Self {
         assert!(!execution_engine.is_null());
 
+        // Calling this function to make sure it is not optimized away by LTO.
+        ExecutionEngine::link_in_mc_jit();
+
         Self {
             execution_engine,
             jit_mode,
         }
     }
 
-    /// This function needs not be called. It is here because it
-    /// references LLVMLinkInMCJIT which prevents its DCE
+    /// Links in the MCJIT static library.
     pub fn link_in_mc_jit() {
         unsafe { LLVMLinkInMCJIT() }
     }
 
-    /// This function needs not be called. It is here because it
-    /// references LLVMLinkInInterpreter which prevents its DCE
+    /// Links in the interpreter static library.
     pub fn link_in_interpreter() {
         unsafe {
             LLVMLinkInInterpreter();

@@ -53,6 +53,7 @@ unsafe fn jit_compile_sum(context: &Context, module: &Module, builder: &Builder,
     let z: IntValue = function.get_nth_param(2)?.into();
 
     let sum = builder.build_int_add(x, y, "sum");
+    
     let sum = builder.build_int_add(sum, z, "sum");
 
     builder.build_return(Some(sum));
