@@ -69,7 +69,7 @@ Experimenting! Random notes on speculative ideas.
     - Download appropriate binary from [wasmlab.io/downloads/wasmo](https://www.wasmlab.io/downloads/wasmo)
 
 ### CUSTOM SECTIONS
-- HOST BINDING SECTION
+- HOST INTERFACE SECTION
     - Target triple definition (Cranelift style)
     - Payload structure
         ```
@@ -77,8 +77,8 @@ Experimenting! Random notes on speculative ideas.
 
         payload_length           - varuint32
 
-        name_length              - varuint32 = 13
-        name_string              - uint8*    = "host-bindings"
+        name_length              - varuint32 = 14
+        name_string              - uint8*    = "host-interface"
 
         target_triple_length     - varuint32
         target_architecture      - uint8
