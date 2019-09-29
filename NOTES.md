@@ -62,7 +62,7 @@ Experimenting! Random notes on speculative ideas.
 - For Unix-like OSes
 
     ```bash
-    curl https://lite.wasmlab.io -sSf | sh
+    curl https://wasmlab.io/wasmo -sSf | sh
     ```
 
 - Windows
@@ -94,6 +94,8 @@ Experimenting! Random notes on speculative ideas.
 - JIT SECTION
     > Contains details of functions to be replaced or created as well as the strategy to use if available.
     - Payload structure
+
+- TBAA SECTION
 
 #### COMPILED PYTHON
 

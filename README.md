@@ -31,7 +31,7 @@ Lastly, it is a platform for learning about WebAssembly, LLVM and how they play 
     curl https://sh.rustup.rs -sSf | sh
     ```
 
-- You need to have `LLVM 6.0.x` installed[¹](#llvm).
+- You need to have `LLVM 8.0.x` installed[¹](#llvm).
     - Check the [known issues](#KNOWN_ISSUE) section for more information.
 
 - Build the project.
@@ -176,10 +176,4 @@ main.call(5, wasm_array);
 ###
 
 ### ATTRIBUTIONS
-These are the nice projects `wasmo` references for its design
 - [inkwell](https://github.com/TheDan64/inkwell) [Apache-2.0] - the LLVM wrapper section is inspired by this awesome project that gives [llvm-sys](https://bitbucket.org/tari/llvm-sys.rs) a type-safe interface.
-- [wasmer](https://github.com/wasmerio/wasmer) [MIT] - wasmo takes some architectural cues taken from wasmer, a WebAssembly runtime with cross-platform portability in mind.
-- [wasmtime](https://github.com/CraneStation/wasmtime) [Apache-2.0] - wasmo also borrows some ideas from this wasmtime a Cranelift-based Webassembly runtime.
-
-If you are interested in this project, you should probably check out [WAVM](https://github.com/WAVM/WAVM) as well.
-In fact, you need to see [these other webassembly runtimes](https://github.com/appcypher/awesome-wasm-runtimes), they are all interesting projects.

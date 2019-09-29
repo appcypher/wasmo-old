@@ -68,7 +68,7 @@ install() {
     # TODO: Seperate release build.
     displayln "Build wasmo project"
     # Build cargo project.
-    LLVM_SYS_60_PREFIX=$1 cargo build --feature "verbose"
+    LLVM_SYS_80_PREFIX=$1 cargo build --feature "verbose"
 
     #--------------------------------------------------
 

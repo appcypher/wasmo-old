@@ -2,14 +2,13 @@
 
 use wasmo_utils::debug;
 
+use wasmo_llvm::types::{fn_type, BasicType};
+use wasmo_llvm::values::IntValue;
 use wasmo_llvm::{
-    types::{fn_type, BasicType},
-    values::IntValue, CompilerResult,
-    Builder, Context, Module, OptimizationLevel, ExecutionEngine, Func,
+    Builder, CompilerResult, Context, ExecutionEngine, Func, Module, OptimizationLevel,
 };
 
-
-fn main()  {
+fn main() {
     println!("\n=== [ jit_example ] ===\n");
 
     jit_example().unwrap();
@@ -37,7 +36,12 @@ pub fn jit_example() -> CompilerResult<()> {
 
 type SumFunc = unsafe extern "C" fn(u64, u64, u64) -> u64;
 
-unsafe fn jit_compile_sum(context: &Context, module: &Module, builder: &Builder, execution_engine: &ExecutionEngine) -> CompilerResult<Func<SumFunc>> {
+unsafe fn jit_compile_sum(
+    context: &Context,
+    module: &Module,
+    builder: &Builder,
+    execution_engine: &ExecutionEngine,
+) -> CompilerResult<Func<SumFunc>> {
     let i64_type: BasicType = context.i64_type().into();
 
     let func_type = fn_type(&[i64_type, i64_type, i64_type], i64_type, false);
@@ -53,7 +57,7 @@ unsafe fn jit_compile_sum(context: &Context, module: &Module, builder: &Builder,
     let z: IntValue = function.get_nth_param(2)?.into();
 
     let sum = builder.build_int_add(x, y, "sum");
-    
+
     let sum = builder.build_int_add(sum, z, "sum");
 
     builder.build_return(Some(sum));
