@@ -80,7 +80,7 @@ RUNTIME:
 
 ### MODULE
 ```rust
-struct Module {
+struct Module:
     data: InstanceData?, // Disposable
     desc: ModuleDesc,
     llvm_ir: llvm.Module?, // Diposable // DEP:aot_compile // DEP:runtime_lazy_compile
