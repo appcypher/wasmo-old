@@ -4,7 +4,9 @@ use std::cell::RefCell;
 
 use std::ffi::CString;
 
-use llvm_sys::core::{LLVMAddFunction, LLVMDisposeModule, LLVMModuleCreateWithName};
+use std::fmt::{Formatter, Display, Result};
+
+use llvm_sys::core::{LLVMAddFunction, LLVMDisposeModule, LLVMModuleCreateWithName, LLVMPrintModuleToString};
 
 use llvm_sys::execution_engine::{
     LLVMCreateExecutionEngineForModule, LLVMCreateInterpreterForModule,
@@ -20,8 +22,10 @@ use super::{
     types::{AsTypeRef, FunctionType},
     values::FunctionValue,
     CompilerError, CompilerResult, Context, ExecutionEngine, InitializationConfig, Linkage,
-    OptimizationLevel, Target,
+    OptimizationLevel,
 };
+
+use crate::target::Target;
 
 ///
 /// TODO:IMPORTANT: Can the Rc be gotten rid of. Does EE own module?
@@ -148,6 +152,15 @@ impl Module {
         }
 
         fn_value
+    }
+
+}
+
+impl Display for Module {
+    fn fmt(&self, f: &mut Formatter) -> Result {
+        let char_ptr = unsafe { LLVMPrintModuleToString(self.module) };
+        let cstring = unsafe { CString::from_raw(char_ptr) };
+        write!(f, "{}", cstring.into_string().expect("Couldn't convert module string to valid UTF-8"))
     }
 }
 

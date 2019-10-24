@@ -8,6 +8,7 @@ mod struct_;
 mod traits;
 mod ty;
 mod vector;
+mod void;
 
 pub use array::ArrayType;
 pub use enums::BasicType;
@@ -19,3 +20,4 @@ pub use struct_::StructType;
 pub(crate) use traits::AsTypeRef;
 pub use ty::Type;
 pub use vector::VectorType;
+pub use void::VoidType;

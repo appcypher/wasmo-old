@@ -2,6 +2,10 @@ use super::Type;
 
 use super::AsTypeRef;
 
+use crate::types::BasicType;
+
+use crate::AddressSpace;
+
 use llvm_sys::prelude::LLVMTypeRef;
 
 ///
@@ -15,6 +19,10 @@ impl PointerType {
         assert!(!ty.is_null());
 
         Self { ty: Type::new(ty) }
+    }
+
+    pub fn ptr_type(&self, address_space: &AddressSpace) -> Self {
+        self.ty.ptr_type(address_space)
     }
 }
 

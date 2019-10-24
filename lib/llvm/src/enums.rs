@@ -1,6 +1,6 @@
 #[macro_use]
 use llvm_sys::LLVMLinkage;
-use llvm_sys::target_machine::LLVMCodeGenFileType;
+use llvm_sys::target_machine::{LLVMCodeGenFileType, LLVMCodeGenOptLevel, LLVMCodeModel, LLVMRelocMode};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum OptimizationLevel {
@@ -12,6 +12,7 @@ pub enum OptimizationLevel {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum RelocationModel {
+    Default,
     PIC,
     Static,
     DynamicNoPIC,
@@ -29,6 +30,54 @@ pub enum CodeModel {
     Medium,
     Large,
 }
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum AddressSpace {
+    Generic = 0,
+    Global = 1,
+    Shared = 3,
+    Const = 4,
+    Local = 5,
+}
+
+impl OptimizationLevel {
+    pub fn to_llvm(&self) -> LLVMCodeGenOptLevel {
+        match self {
+            OptimizationLevel::None => LLVMCodeGenOptLevel::LLVMCodeGenLevelNone,
+            OptimizationLevel::Less => LLVMCodeGenOptLevel::LLVMCodeGenLevelLess,
+            OptimizationLevel::Default => LLVMCodeGenOptLevel::LLVMCodeGenLevelDefault,
+            OptimizationLevel::Aggressive => LLVMCodeGenOptLevel::LLVMCodeGenLevelAggressive,
+        }
+    }
+}
+
+impl CodeModel {
+    pub fn to_llvm(&self) -> LLVMCodeModel {
+        match self {
+            CodeModel::Default => LLVMCodeModel::LLVMCodeModelDefault,
+            CodeModel::JITDefault => LLVMCodeModel::LLVMCodeModelJITDefault,
+            CodeModel::Small => LLVMCodeModel::LLVMCodeModelSmall,
+            CodeModel::Kernel => LLVMCodeModel::LLVMCodeModelKernel,
+            CodeModel::Medium => LLVMCodeModel::LLVMCodeModelMedium,
+            CodeModel::Large => LLVMCodeModel::LLVMCodeModelLarge,
+        }
+    }
+}
+
+impl RelocationModel {
+    pub fn to_llvm(&self) -> LLVMRelocMode {
+        match self {
+            RelocationModel::Default => LLVMRelocMode::LLVMRelocDefault,
+            RelocationModel::Static => LLVMRelocMode::LLVMRelocStatic,
+            RelocationModel::PIC => LLVMRelocMode::LLVMRelocPIC,
+            RelocationModel::DynamicNoPIC => LLVMRelocMode::LLVMRelocDynamicNoPic,
+            RelocationModel::ROPI => LLVMRelocMode::LLVMRelocROPI,
+            RelocationModel::RWPI => LLVMRelocMode::LLVMRelocRWPI,
+            RelocationModel::ROPI_RWPI => LLVMRelocMode::LLVMRelocROPI_RWPI,
+        }
+    }
+}
+
 
 enum_rename! {
     LLVMCodeGenFileType >> CodeGenFileType {

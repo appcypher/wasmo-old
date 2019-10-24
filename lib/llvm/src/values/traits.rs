@@ -30,9 +30,9 @@ impl IntMathValue for VectorValue {
     }
 }
 
-impl FloatMathValue for IntValue {
+impl FloatMathValue for FloatValue {
     fn new(value: LLVMValueRef) -> Self {
-        IntValue::new(value)
+        FloatValue::new(value)
     }
 }
 

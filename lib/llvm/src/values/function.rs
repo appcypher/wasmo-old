@@ -9,7 +9,10 @@ use llvm_sys::prelude::LLVMValueRef;
 use crate::{BasicBlock, Context, Linkage};
 
 use super::{
-    super::{errors::GetValue, CompilerError, CompilerResult},
+    super::{
+        errors::{GetValue, GetType}, CompilerError, CompilerResult,
+        types::{FunctionType, BasicType},
+    },
     AsValueRef, BasicValue,
 };
 
@@ -76,6 +79,15 @@ impl FunctionValue {
         }
 
         Ok(BasicValue::new(param))
+    }
+
+    pub fn get_type(&self) -> CompilerResult<FunctionType> {
+        if let BasicType::PointerType(ty) = self.val.get_type() {
+            if let BasicType::FunctionType(ty) = ty.ty.get_element_type() {
+                return Ok(ty)
+            }
+        }
+        Err(CompilerError::GetType(GetType::CantGetType(String::from("Function type"))))
     }
 
     ///

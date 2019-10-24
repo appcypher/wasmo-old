@@ -1,6 +1,23 @@
-use llvm_sys::target_machine::{LLVMTargetMachineRef, LLVMTargetRef};
+use llvm_sys::target_machine::{
+    LLVMCreateTargetDataLayout, LLVMCreateTargetMachine, LLVMDisposeTargetMachine,
+    LLVMGetDefaultTargetTriple, LLVMGetTargetDescription, LLVMGetTargetFromTriple,
+    LLVMNormalizeTargetTriple, LLVMTargetMachineRef, LLVMTargetRef,
+};
+
+use llvm_sys::target::{
+    LLVMCreateTargetData, LLVMDisposeTargetData, LLVMIntPtrType, LLVMIntPtrTypeForAS,
+    LLVMTargetDataRef,
+};
 
 use super::{errors::TargetInit, CompilerError, CompilerResult};
+
+use crate::types::IntType;
+
+use crate::enums::{CodeModel, OptimizationLevel, RelocationModel};
+
+use crate::AddressSpace;
+
+use std::ffi::{CStr, CString};
 
 ///
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -38,6 +55,31 @@ impl Target {
         assert!(!target.is_null());
 
         Target { target }
+    }
+
+    pub fn from_triple(triple: &str) -> CompilerResult<Self> {
+        let c_string = CString::new(triple)
+            .expect("Conversion of triple string to cstring failed unexpectedly");
+
+        let mut target = std::ptr::null_mut();
+
+        let mut error_string = unsafe { std::mem::zeroed() };
+
+        let error_code =
+            unsafe { LLVMGetTargetFromTriple(c_string.as_ptr(), &mut target, &mut error_string) };
+
+        if error_code != 0 {
+            let error_string = unsafe {
+                CStr::from_ptr(error_string)
+                    .to_str()
+                    .expect("Conversion of error string from cstring failed unexpectedly")
+            };
+            return Err(CompilerError::TargetInit(
+                TargetInit::CantCreateTargetFromTriple(error_string),
+            ));
+        }
+
+        Ok(Target::new(target))
     }
 
     ///
@@ -158,7 +200,135 @@ impl Target {
             }
         }
     }
+
+    pub fn get_default_triple() -> &'static str {
+        unsafe {
+            CStr::from_ptr(LLVMGetDefaultTargetTriple())
+                .to_str()
+                .expect("Conversion of default triple string from cstring failed unexpectedly")
+        }
+    }
+
+    pub fn normalize_target_triple(triple: &str) -> &str {
+        let c_string = CString::new(triple)
+            .expect("Conversion of triple string to cstring failed unexpectedly");
+
+        unsafe {
+            CStr::from_ptr(LLVMNormalizeTargetTriple(c_string.as_ptr()))
+                .to_str()
+                .expect("Conversion of triple string from cstring failed unexpectedly")
+        }
+    }
+
+    pub fn create_target_machine(
+        &self,
+        triple: &str,
+        cpu: &str,
+        features: &str,
+        level: OptimizationLevel,
+        reloc_mode: RelocationModel,
+        code_model: CodeModel,
+    ) -> Option<TargetMachine> {
+        let triple = CString::new(triple)
+            .expect("Conversion of triple string to cstring failed unexpectedly");
+        let cpu =
+            CString::new(cpu).expect("Conversion of cpu string to cstring failed unexpectedly");
+        let features = CString::new(features)
+            .expect("Conversion of features string to cstring failed unexpectedly");
+
+        let target_machine = unsafe {
+            LLVMCreateTargetMachine(
+                self.target,
+                triple.as_ptr(),
+                cpu.as_ptr(),
+                features.as_ptr(),
+                level.to_llvm(),
+                reloc_mode.to_llvm(),
+                code_model.to_llvm(),
+            )
+        };
+
+        if target_machine.is_null() {
+            return None;
+        }
+
+        Some(TargetMachine::new(target_machine))
+    }
+
+    pub fn get_target_description(&self) -> &str {
+        unsafe {
+            CStr::from_ptr(LLVMGetTargetDescription(self.target))
+                .to_str()
+                .expect("Conversion of target description string from cstring failed unexpectedly")
+        }
+    }
 }
 
 /// Contains data holding target-specific information like the triple and methods for getting this information.
-pub struct TargetMachine {}
+pub struct TargetMachine {
+    machine: LLVMTargetMachineRef,
+}
+
+impl TargetMachine {
+    fn new(target_machine: LLVMTargetMachineRef) -> Self {
+        assert!(!target_machine.is_null());
+
+        TargetMachine {
+            machine: target_machine,
+        }
+    }
+
+    pub fn get_target_data(&self) -> TargetData {
+        let data_layout = unsafe { LLVMCreateTargetDataLayout(self.machine) };
+
+        TargetData::new(data_layout)
+    }
+}
+
+impl Drop for TargetMachine {
+    fn drop(&mut self) {
+        unsafe { LLVMDisposeTargetMachine(self.machine) }
+    }
+}
+
+///
+pub struct TargetData {
+    pub(crate) data: LLVMTargetDataRef,
+}
+
+impl TargetData {
+    fn new(target_data: LLVMTargetDataRef) -> TargetData {
+        assert!(!target_data.is_null());
+
+        TargetData { data: target_data }
+    }
+
+    // Fails if datalayout spec is wrong
+    pub fn create(description: &str) -> Option<Self> {
+        let c_string = CString::new(description)
+            .expect("Conversion of target description to cstring failed unexpectedly");
+
+        let target_data = unsafe { LLVMCreateTargetData(c_string.as_ptr()) };
+
+        if target_data.is_null() {
+            return None;
+        }
+
+        Some(TargetData::new(target_data))
+    }
+
+    pub fn machine_int_type(&self, address_space: Option<&AddressSpace>) -> IntType {
+        let ty = match address_space {
+            Some(address_space) => unsafe { LLVMIntPtrTypeForAS(self.data, *address_space as _) },
+            None => unsafe { LLVMIntPtrType(self.data) },
+        };
+
+        IntType::new(ty)
+    }
+}
+
+impl Drop for TargetData {
+    fn drop(&mut self) {
+        unsafe { LLVMDisposeTargetData(self.data) }
+    }
+}

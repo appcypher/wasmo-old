@@ -27,6 +27,8 @@ pub fn jit_example() -> CompilerResult<()> {
 
     let sum = unsafe { jit_compile_sum(&context, &module, &builder, &execution_engine)? };
 
+    println!("module => {}", module);
+
     let (x, y, z) = (1, 2, 3);
 
     println!("{} + {} + {} = {}", x, y, z, unsafe { sum.call(x, y, z) });
@@ -60,7 +62,7 @@ unsafe fn jit_compile_sum(
 
     let sum = builder.build_int_add(sum, z, "sum");
 
-    builder.build_return(Some(sum));
+    builder.build_return(Some(sum.into()));
 
     Ok(execution_engine.get_function("sum")?)
 }

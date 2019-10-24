@@ -26,3 +26,4 @@ enum_impl_def! {
         LLVMStructTypeKind => StructValue
     }
 }
+

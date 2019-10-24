@@ -14,7 +14,7 @@ documentation = "https://github.com/appcypher/wasmo"
 homepage = "https://github.com/appcypher/wasmo"
 
 [dependencies]
-wasmparser = "0.30.0"
+wasmparser = "0.31.1"
 wasmo-llvm = { path = "../llvm" }
 wasmo-utils = { path = "../utils" }
 wasmo-runtime = { path =  "../runtime" }
@@ -22,3 +22,7 @@ wasmo-runtime = { path =  "../runtime" }
 [features]
 debug = []
 verbose = []
+aot = []
+jit-eager = []
+jit-lazy = []
+jit-eval = []

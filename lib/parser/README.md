@@ -1,4 +1,6 @@
-This parser is designed to parse an entire wasm module and generate corresponding intermediate representation. It is not the best for parsing a wasm module in bits. For that, you may need  [wasmparser](https://github.com/yurydelendik/wasmparser.rs)
+## [DEPRECATED]
+
+Wasmo now uses [wasmparser](https://github.com/yurydelendik/wasmparser.rs)
 
 _Resources for learning more about wasm binary:_
 - https://webassembly.github.io/spec/

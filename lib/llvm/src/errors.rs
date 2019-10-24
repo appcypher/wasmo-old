@@ -7,6 +7,7 @@ pub enum CompilerError {
     TargetInit(TargetInit),
     ExecutionEngine(String),
     GetValue(GetValue),
+    GetType(GetType),
 }
 
 //-------------- JIT LOOKUP --------------------//
@@ -27,6 +28,7 @@ pub enum TargetInit {
     CantInitializeNativeASMPrinter,
     CantInitializeNativeASMParser,
     CantInitializeNativeDisassembler,
+    CantCreateTargetFromTriple(&'static str),
 }
 
 //-------------- VALUES --------------------//
@@ -37,4 +39,12 @@ pub enum GetValue {
     CantGetNthParam(u32),
     CantGetFirstParam,
     CantGetLastParam,
+}
+
+//-------------- TYPES --------------------//
+
+///
+#[derive(Debug, PartialEq, Eq)]
+pub enum GetType {
+    CantGetType(String),
 }

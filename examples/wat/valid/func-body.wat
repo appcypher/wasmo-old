@@ -1,0 +1,55 @@
+(module
+    (memory 0 1)
+
+    (func (export "extend") (type 0)
+        (local i32 i32 i32)
+        (local.get 0)
+        (local.get 1)
+        (i32.add)
+        (local.get 2)
+        (i32.sub)
+        (local.tee 2 (i32.const 100))
+        (i32.mul)
+        (i64.extend_i32_s)
+        (drop)
+    )
+
+    (func (export "identity") (type 1)
+        (local.get 0)
+    )
+
+    (func (export "add") (param i64 i64) (result i64)
+        (local.get 0)
+        (local.get 1)
+        (i64.mul)
+    )
+
+    (func (export "add0") (param f32) (result f32)
+        (local f32 f32)
+        (local.get 0)
+        (local.get 1)
+        (local.get 2)
+        (f32.mul)
+        (f32.mul)
+    )
+
+    (func (export "add1") (param f64 f64 f64) (result f64)
+        (local.get 0)
+        (local.get 1)
+        (local.get 2)
+        (f64.add)
+        (f64.add)
+    )
+
+    (func (export "add2")  (result i32)
+        (i32.const 200)
+        (i32.const 500)
+        (i32.add)
+    )
+
+    (start 0)
+
+    (type (func ))
+
+    (type (func (param i64) (result i64)))
+)

@@ -113,39 +113,15 @@ Lastly, it is a platform for learning about WebAssembly, LLVM and how they play 
 
 ### API (Susceptible to Change!)
 ```rust
-// Create compiler flags.
-let compiler_flags = Some(CompilerOptions {
-    optimization_level: 3,
-    exclude_passes: vec![
-        LLVMPass::InstCombine,
-    ],
-    runtime_ignores: vec![
-        RuntimeProperty::SignatureChecks,
-        RuntimeProperty::MemoryBoundsChecks,
-    ],
-    strategy: CompilationStrategy::JITEager,
-});
+// AOT
+let module: ModuleAOT = Module::create_aot(&wasm_code);
 
-// Create wasm options.
-let options = Some(InstanceOptions {
-    compiler_flags,
-    abi: vec![ABI::Wasabi],
-});
+let instance: InstanceAOT = module.instantiate(&imports);
 
-// JIT compile module in current process.
-let module = compile(&wasm_binary, &options);
+instance.execute(&args)?;
 
-// Instantiate module.
-let instance = module.instantiate(&imports);
-
-// Get the exported main function from instance.
-let main = instance.get_func("main");
-
-// Store array of items in wasm memory 0
-let wasm_array = instance.set_array(&arguments);
-
-// Call the function.
-main.call(5, wasm_array);
+// JIT
+...
 ```
 
 ### CURRENT SUPPORT
@@ -176,4 +152,4 @@ main.call(5, wasm_array);
 ###
 
 ### ATTRIBUTIONS
-- [inkwell](https://github.com/TheDan64/inkwell) [Apache-2.0] - the LLVM wrapper section is inspired by this awesome project that gives [llvm-sys](https://bitbucket.org/tari/llvm-sys.rs) a type-safe interface.
+- [inkwell](https://github.com/TheDan64/inkwell) [Apache-2.0] - the LLVM wrapper is based on this awesome project. It provides a type-safe interface to [llvm-sys](https://bitbucket.org/tari/llvm-sys.rs).
