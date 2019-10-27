@@ -1,16 +1,18 @@
-#### TODO
-- [ ] Generate module information
-- [ ] Generate simple functions and operations for test
-- [ ] Simple AOT compilation example
-- [ ] Simple Regular compilation example
-- [ ] Simple Lazy compilation example with ORC
-- [ ] Simple REPL compilation example with ORC
-- [ ] Proper planning of module/ir memory management
-- [ ] Trap and checks integration (checks types)
-- [ ] Proper planning of wasm memory model (page reservation and guard page)
-- [ ] Turn string conversion panics and asserts to CompilerError
+<h2 align="center">LLVM</h2>
 
-#### OWNERSHIP
+--------------
+
+### DESCRIPTION
+
+Implementation of a type safe wrapper around llvm-sys.
+
+--------------
+
+### MAP
+
+--------------
+
+### OWNERSHIP DETAILS
 - Context
     - can be shared by
         - Module
@@ -37,5 +39,8 @@
 - Values
     - are consumed when used in other data structures.
 
-#### Reason I'm not using Inkwell
-[Inkwell](https://github.com/TheDan64/inkwell) is a great project and this project is largely based on it, but I decided wasmo needs its own wrapper because wasmo is based on LLVM and it will be nice to have very little abstraction blackbox as possible.
+--------------
+
+### INKWELL
+
+[Inkwell](https://github.com/TheDan64/inkwell) is a great project and this project is largely based on it. However, since `wasmo` is an LLVM-based project, it is important to have a greater degree of control of the API that wraps it. Inkwell doesn't yet have an ORCJIT API which is crucial to `wasmo`.

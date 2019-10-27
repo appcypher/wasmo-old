@@ -16,7 +16,6 @@ license = "Apache-2.0"
 [dependencies]
 wasmo-llvm = { path = "../llvm" }
 wasmo-utils = { path = "../utils" }
-wasmo-parser = { path = "../parser" }
 libc = "0.2.49"
 hashbrown = "0.6"
 

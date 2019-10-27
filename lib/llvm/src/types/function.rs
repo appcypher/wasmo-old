@@ -61,6 +61,7 @@ pub fn fn_type(
 ) -> FunctionType {
     let mut param_types: Vec<LLVMTypeRef> = param_types.iter().map(|ty| ty.as_ref()).collect();
     let return_type = return_type.as_ref();
+    println!("param_types = {}", param_types.len());
     let ty = unsafe {
         LLVMFunctionType(
             return_type,

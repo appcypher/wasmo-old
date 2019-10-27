@@ -5,9 +5,9 @@ use std::ffi::CString;
 use llvm_sys::prelude::LLVMBuilderRef;
 
 use llvm_sys::core::{
-    LLVMBuildAdd, LLVMBuildAlloca, LLVMBuildFAdd, LLVMBuildRet, LLVMBuildRetVoid,
-    LLVMCreateBuilder, LLVMDisposeBuilder, LLVMPositionBuilder, LLVMPositionBuilderAtEnd,
-    LLVMPositionBuilderBefore, LLVMBuildFSub, LLVMBuildSub, LLVMBuildFMul, LLVMBuildMul
+    LLVMBuildAdd, LLVMBuildAlloca, LLVMBuildFAdd, LLVMBuildFMul, LLVMBuildFSub, LLVMBuildMul,
+    LLVMBuildRet, LLVMBuildRetVoid, LLVMBuildSub, LLVMCreateBuilder, LLVMDisposeBuilder,
+    LLVMPositionBuilder, LLVMPositionBuilderAtEnd, LLVMPositionBuilderBefore,
 };
 
 use wasmo_utils::debug;
@@ -65,7 +65,7 @@ impl Builder {
 
     ///
     pub fn build_int_add<T: IntMathValue>(&self, rhs: T, lhs: T, name: &str) -> T {
-        let name = CString::new(name).expect("Conversion of name string to cstring failed");
+        let name = CString::new(name).expect("Conversion of name string to c_string failed");
 
         let value =
             unsafe { LLVMBuildAdd(self.builder, lhs.as_ref(), rhs.as_ref(), name.as_ptr()) };
@@ -75,7 +75,7 @@ impl Builder {
 
     ///
     pub fn build_float_add<T: FloatMathValue>(&self, lhs: T, rhs: T, name: &str) -> T {
-        let c_string = CString::new(name).expect("Conversion of name string to cstring failed");
+        let c_string = CString::new(name).expect("Conversion of name string to c_string failed");
 
         let value =
             unsafe { LLVMBuildFAdd(self.builder, lhs.as_ref(), rhs.as_ref(), c_string.as_ptr()) };
@@ -85,7 +85,7 @@ impl Builder {
 
     ///
     pub fn build_int_sub<T: IntMathValue>(&self, lhs: T, rhs: T, name: &str) -> T {
-        let c_string = CString::new(name).expect("Conversion of name string to cstring failed");
+        let c_string = CString::new(name).expect("Conversion of name string to c_string failed");
 
         let value =
             unsafe { LLVMBuildSub(self.builder, lhs.as_ref(), rhs.as_ref(), c_string.as_ptr()) };
@@ -95,7 +95,7 @@ impl Builder {
 
     ///
     pub fn build_float_sub<T: FloatMathValue>(&self, lhs: T, rhs: T, name: &str) -> T {
-        let c_string = CString::new(name).expect("Conversion of name string to cstring failed");
+        let c_string = CString::new(name).expect("Conversion of name string to c_string failed");
 
         let value =
             unsafe { LLVMBuildFSub(self.builder, lhs.as_ref(), rhs.as_ref(), c_string.as_ptr()) };
@@ -105,7 +105,7 @@ impl Builder {
 
     ///
     pub fn build_int_mul<T: IntMathValue>(&self, lhs: T, rhs: T, name: &str) -> T {
-        let c_string = CString::new(name).expect("Conversion of name string to cstring failed");
+        let c_string = CString::new(name).expect("Conversion of name string to c_string failed");
 
         let value =
             unsafe { LLVMBuildMul(self.builder, lhs.as_ref(), rhs.as_ref(), c_string.as_ptr()) };
@@ -115,7 +115,7 @@ impl Builder {
 
     ///
     pub fn build_float_mul<T: FloatMathValue>(&self, lhs: T, rhs: T, name: &str) -> T {
-        let c_string = CString::new(name).expect("Conversion of name string to cstring failed");
+        let c_string = CString::new(name).expect("Conversion of name string to c_string failed");
 
         let value =
             unsafe { LLVMBuildFMul(self.builder, lhs.as_ref(), rhs.as_ref(), c_string.as_ptr()) };

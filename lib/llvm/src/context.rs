@@ -5,7 +5,8 @@ use std::ffi::CString;
 use llvm_sys::core::{
     LLVMContextCreate, LLVMContextDispose, LLVMCreateBuilderInContext, LLVMDoubleTypeInContext,
     LLVMFloatTypeInContext, LLVMInt32TypeInContext, LLVMInt64TypeInContext, LLVMInt8TypeInContext,
-    LLVMModuleCreateWithNameInContext, LLVMVoidTypeInContext, LLVMStructTypeInContext, LLVMStructCreateNamed, LLVMStructSetBody
+    LLVMModuleCreateWithNameInContext, LLVMStructCreateNamed, LLVMStructSetBody,
+    LLVMStructTypeInContext, LLVMVoidTypeInContext,
 };
 
 use llvm_sys::target::{LLVMIntPtrTypeForASInContext, LLVMIntPtrTypeInContext};
@@ -15,8 +16,8 @@ use llvm_sys::prelude::{LLVMContextRef, LLVMTypeRef};
 use wasmo_utils::debug;
 
 use crate::{
-    types::{FloatType, IntType, VoidType, BasicType, StructType},
-    Builder, Module, AddressSpace,
+    types::{BasicType, FloatType, IntType, StructType, VoidType},
+    AddressSpace, Builder, Module,
 };
 
 use crate::target::TargetData;
@@ -93,36 +94,55 @@ impl Context {
         let ty = unsafe {
             LLVMStructTypeInContext(
                 *self.context,
-                types.iter().map(|ty| ty.as_ref()).collect::<Vec<LLVMTypeRef>>().as_mut_ptr(),
+                types
+                    .iter()
+                    .map(|ty| ty.as_ref())
+                    .collect::<Vec<LLVMTypeRef>>()
+                    .as_mut_ptr(),
                 types.len() as _,
-                is_packed as _
+                is_packed as _,
             )
         };
 
         StructType::new(ty)
     }
 
-    pub fn struct_type_with_name(&self, struct_name: &str, types: &[BasicType], is_packed: bool) -> StructType {
+    pub fn struct_type_with_name(
+        &self,
+        struct_name: &str,
+        types: &[BasicType],
+        is_packed: bool,
+    ) -> StructType {
         let c_string = CString::new(struct_name)
-            .expect("Conversion of struct name string to cstring failed unexpectedly");
+            .expect("Conversion of struct name string to c_string failed unexpectedly");
 
         let mut ty = unsafe { LLVMStructCreateNamed(*self.context, c_string.as_ptr()) };
 
         unsafe {
             LLVMStructSetBody(
                 ty,
-                types.iter().map(|ty| ty.as_ref()).collect::<Vec<LLVMTypeRef>>().as_mut_ptr(),
+                types
+                    .iter()
+                    .map(|ty| ty.as_ref())
+                    .collect::<Vec<LLVMTypeRef>>()
+                    .as_mut_ptr(),
                 types.len() as _,
-                is_packed as _
+                is_packed as _,
             )
         }
 
         StructType::new(ty)
     }
 
-    pub fn machine_int_type(&self, target_data: &TargetData, address_space: Option<AddressSpace>) -> IntType {
+    pub fn machine_int_type(
+        &self,
+        target_data: &TargetData,
+        address_space: Option<AddressSpace>,
+    ) -> IntType {
         let ty = match address_space {
-            Some(address_space) => unsafe { LLVMIntPtrTypeForASInContext(*self.context, target_data.data, address_space as _) },
+            Some(address_space) => unsafe {
+                LLVMIntPtrTypeForASInContext(*self.context, target_data.data, address_space as _)
+            },
             None => unsafe { LLVMIntPtrTypeInContext(*self.context, target_data.data) },
         };
 

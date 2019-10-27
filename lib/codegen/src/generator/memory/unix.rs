@@ -1,8 +1,18 @@
+use wasmo_llvm::{Builder, Context};
+use wasmparser::ResizableLimits;
+
 pub struct MemoryGenerator();
 
 impl MemoryGenerator {
-    // MEMORY ENTRY
-    pub fn generate_memory_setup_code() -> () {}
+    /// Generates IR for calling mmap and co needed for creating
+    /// memory.
+    pub fn generate_memory_setup_code(
+        limits: &ResizableLimits,
+        context: &Context,
+        builder: &Builder,
+    ) -> () {
+        // TODO
+    }
 
     // DATA
     pub fn generate_memory_initialization_code(values: &[u8]) -> () {}
@@ -22,7 +32,6 @@ impl MemoryGenerator {
     pub fn generate_memory_size_function() -> () {}
 }
 
-
 pub struct TableGenerator();
 
 impl TableGenerator {
@@ -31,12 +40,8 @@ impl TableGenerator {
 
     // ELEM
     pub fn generate_table_initialization_code() -> () {}
-
 }
-
 
 pub struct GlobalGenerator();
 
-impl GlobalGenerator {
-
-}
+impl GlobalGenerator {}

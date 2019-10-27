@@ -1,20 +1,9 @@
 use std::env;
+mod utils;
 
 use wasmo_utils::verbose;
-
-// Use clap for argument parsing.
+use utils::Arguments;
 
 fn main() {
-    println!("\n === [ wasmo ] ===\n");
-
-    println!("|                   |");
-    println!("|    STAY TUNED!    |");
-    println!("|                   |");
-
-    // Get all arguments.
-    let args: Vec<String> = env::args().collect();
-
-    verbose!("args = {:#?}\n", args);
-
-    println!("\n === [ wasmo ] ===\n");
+    Arguments::new();
 }

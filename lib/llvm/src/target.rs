@@ -9,6 +9,7 @@ use llvm_sys::target::{
     LLVMTargetDataRef,
 };
 
+
 use super::{errors::TargetInit, CompilerError, CompilerResult};
 
 use crate::types::IntType;
@@ -16,6 +17,8 @@ use crate::types::IntType;
 use crate::enums::{CodeModel, OptimizationLevel, RelocationModel};
 
 use crate::AddressSpace;
+
+use crate::support::LLVMString;
 
 use std::ffi::{CStr, CString};
 
@@ -59,7 +62,7 @@ impl Target {
 
     pub fn from_triple(triple: &str) -> CompilerResult<Self> {
         let c_string = CString::new(triple)
-            .expect("Conversion of triple string to cstring failed unexpectedly");
+            .expect("Conversion of triple string to CString failed");
 
         let mut target = std::ptr::null_mut();
 
@@ -72,7 +75,7 @@ impl Target {
             let error_string = unsafe {
                 CStr::from_ptr(error_string)
                     .to_str()
-                    .expect("Conversion of error string from cstring failed unexpectedly")
+                    .expect("Conversion of error string from c_string failed")
             };
             return Err(CompilerError::TargetInit(
                 TargetInit::CantCreateTargetFromTriple(error_string),
@@ -201,24 +204,50 @@ impl Target {
         }
     }
 
-    pub fn get_default_triple() -> &'static str {
+
+    pub fn get_default_triple() -> LLVMString {
+        // Creating an LLVMString from returned pointer.
         unsafe {
-            CStr::from_ptr(LLVMGetDefaultTargetTriple())
-                .to_str()
-                .expect("Conversion of default triple string from cstring failed unexpectedly")
+            LLVMString::new(LLVMGetDefaultTargetTriple())
         }
     }
 
-    pub fn normalize_target_triple(triple: &str) -> &str {
-        let c_string = CString::new(triple)
-            .expect("Conversion of triple string to cstring failed unexpectedly");
-
+    pub fn normalize_target_triple(triple: &str) -> LLVMString {
+        // Borrowing triple pointer.
+        // Creating an LLVMString from returned pointer.
         unsafe {
-            CStr::from_ptr(LLVMNormalizeTargetTriple(c_string.as_ptr()))
-                .to_str()
-                .expect("Conversion of triple string from cstring failed unexpectedly")
+            LLVMString::new(LLVMNormalizeTargetTriple(triple.as_ptr() as _))
         }
     }
+
+    // pub fn get_default_triple() -> String {
+    //     unsafe {
+    //         // Takes ownership of C string gotten from `LLVMGetDefaultTargetTriple` and clones it.
+    //         // Clones underlying data to a String.
+    //         // REVIEW: Deallocates C string with Rust allocator!!!
+    //         CString::from_raw(LLVMGetDefaultTargetTriple())
+    //             .to_str()
+    //             .expect("Conversion of default triple string from c_string failed")
+    //             .to_owned()
+    //     }
+    // }
+
+    // pub fn normalize_target_triple(triple: &str) -> String {
+    //     // Creates a new C string from `triple`
+    //     let c_string = CString::new(triple)
+    //         .expect("Conversion of triple string to CString failed");
+
+    //     unsafe {
+    //         // Temporarily borrows `c_string` C string.
+    //         // Takes ownership of C string gotten from `LLVMNormalizeTargetTriple` and clones it.
+    //         // Clones underlying data to a String.
+    //         // REVIEW: Deallocates C string with Rust allocator!!!
+    //         CString::from_raw(LLVMNormalizeTargetTriple(c_string.as_ptr()))
+    //             .to_str()
+    //             .expect("Conversion of default triple string from c_string failed")
+    //             .to_owned()
+    //     }
+    // }
 
     pub fn create_target_machine(
         &self,
@@ -230,11 +259,11 @@ impl Target {
         code_model: CodeModel,
     ) -> Option<TargetMachine> {
         let triple = CString::new(triple)
-            .expect("Conversion of triple string to cstring failed unexpectedly");
+            .expect("Conversion of triple string to CString failed");
         let cpu =
-            CString::new(cpu).expect("Conversion of cpu string to cstring failed unexpectedly");
+            CString::new(cpu).expect("Conversion of cpu string to CString failed");
         let features = CString::new(features)
-            .expect("Conversion of features string to cstring failed unexpectedly");
+            .expect("Conversion of features string to CString failed");
 
         let target_machine = unsafe {
             LLVMCreateTargetMachine(
@@ -259,7 +288,7 @@ impl Target {
         unsafe {
             CStr::from_ptr(LLVMGetTargetDescription(self.target))
                 .to_str()
-                .expect("Conversion of target description string from cstring failed unexpectedly")
+                .expect("Conversion of target description string from CStr failed")
         }
     }
 }
@@ -306,7 +335,7 @@ impl TargetData {
     // Fails if datalayout spec is wrong
     pub fn create(description: &str) -> Option<Self> {
         let c_string = CString::new(description)
-            .expect("Conversion of target description to cstring failed unexpectedly");
+            .expect("Conversion of target description to CString failed");
 
         let target_data = unsafe { LLVMCreateTargetData(c_string.as_ptr()) };
 

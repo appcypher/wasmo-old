@@ -7,7 +7,7 @@ mod enums;
 pub mod errors;
 mod execution_engine;
 mod module;
-pub mod string;
+pub mod support;
 pub mod target;
 pub mod types;
 pub mod values;

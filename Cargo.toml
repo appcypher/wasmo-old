@@ -15,13 +15,15 @@ license = "Apache-2.0"
 
 [dependencies]
 wasmo-codegen = { path = "lib/codegen" }
-wasmo-llvm = { path = "lib/llvm" }
+wasmo-llvm = { version="0.0.1",  path = "lib/llvm" }
 wasmo-utils = { path = "lib/utils" }
+wasmo-runtime = { path = "lib/runtime" }
 dotenv = "0.13.0"
+clap = "2.33.0"
 
 [features]
-debug = ["wasmo-codegen/debug"]
-verbose = ["wasmo-codegen/verbose", "wasmo-codegen/debug"]
+debug = ["wasmo-codegen/debug", "wasmo-llvm/debug"]
+verbose = ["wasmo-codegen/verbose", "wasmo-llvm/verbose"]
 
 [profile.release]
 lto = "fat"

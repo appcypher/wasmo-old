@@ -4,9 +4,11 @@ use std::cell::RefCell;
 
 use std::ffi::CString;
 
-use std::fmt::{Formatter, Display, Result};
+use std::fmt::{Display, Formatter, Result};
 
-use llvm_sys::core::{LLVMAddFunction, LLVMDisposeModule, LLVMModuleCreateWithName, LLVMPrintModuleToString};
+use llvm_sys::core::{
+    LLVMAddFunction, LLVMDisposeModule, LLVMModuleCreateWithName, LLVMPrintModuleToString,
+};
 
 use llvm_sys::execution_engine::{
     LLVMCreateExecutionEngineForModule, LLVMCreateInterpreterForModule,
@@ -17,8 +19,9 @@ use llvm_sys::prelude::{LLVMContextRef, LLVMModuleRef};
 
 use wasmo_utils::debug;
 
+use crate::support::LLVMString;
+
 use super::{
-    string::to_rust_string,
     types::{AsTypeRef, FunctionType},
     values::FunctionValue,
     CompilerError, CompilerResult, Context, ExecutionEngine, InitializationConfig, Linkage,
@@ -89,7 +92,9 @@ impl Module {
 
         if code == 1 {
             return Err(CompilerError::ExecutionEngine(unsafe {
-                to_rust_string(error_string)
+                CString::from_raw(error_string)
+                    .into_string()
+                    .expect("Conversion of error string to CString failed")
             }));
         }
 
@@ -127,7 +132,9 @@ impl Module {
 
         if code == 1 {
             return Err(CompilerError::ExecutionEngine(unsafe {
-                to_rust_string(error_string)
+                CString::from_raw(error_string)
+                    .into_string()
+                    .expect("Conversion of error string to CString failed")
             }));
         }
 
@@ -153,14 +160,14 @@ impl Module {
 
         fn_value
     }
-
 }
 
 impl Display for Module {
+    ///
     fn fmt(&self, f: &mut Formatter) -> Result {
-        let char_ptr = unsafe { LLVMPrintModuleToString(self.module) };
-        let cstring = unsafe { CString::from_raw(char_ptr) };
-        write!(f, "{}", cstring.into_string().expect("Couldn't convert module string to valid UTF-8"))
+        let llvm_string = unsafe { LLVMString::new(LLVMPrintModuleToString(self.module)) };
+
+        write!(f, "{}", llvm_string.to_string())
     }
 }
 

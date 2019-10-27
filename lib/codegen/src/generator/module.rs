@@ -1,9 +1,11 @@
 #![allow(clippy::cognitive_complexity)]
 
 use crate::{
-    convert::Runtime, convert::LLVM, options::CodegenOptions,
-    generator::{FunctionGenerator},
-    error::{Offset, ParserError,ParserResult}
+    convert::Runtime,
+    convert::LLVM,
+    error::{Offset, ParserError, ParserResult},
+    generator::FunctionGenerator,
+    options::CodegenOptions,
 };
 use std::ptr::null;
 use wasmo_llvm::target::{Target, TargetData};
@@ -17,16 +19,33 @@ use wasmo_runtime::data::{FuncData, ModuleData};
 use wasmo_utils::{debug, verbose};
 use wasmparser::{FuncType, Operator, Parser, ParserState, WasmDecoder};
 
-// TODO: MODULARIZATION
-// at section entry fork parserstate, binary remains shared,
-// generate_type(), generate_memory(), generate_function(), etc. Live in separate dirs.
+///
+pub struct Reusables {
+    pub(crate) i32_type: IntType,
+    pub(crate) i64_type: IntType,
+    pub(crate) f32_type: FloatType,
+    pub(crate) f64_type: FloatType,
+}
+
+impl Reusables {
+    ///
+    fn new(context: &Context) -> Self {
+        Self {
+            i32_type: context.i32_type(),
+            i64_type: context.i64_type(),
+            f32_type: context.f32_type(),
+            f64_type: context.f64_type(),
+        }
+    }
+}
+
+///
 pub struct ModuleGenerator<'a> {
     parser: Parser<'a>,
     instance_context_type: PointerType,
-    runtime_data: ModuleData,
-    llvm_context: Context,
-    llvm_builder: Builder,
-    llvm_func_types: Vec<FunctionType>,
+    context: Context,
+    builder: Builder,
+    function_types: Vec<FunctionType>,
     function_index: u32,
     options: CodegenOptions,
 }
@@ -34,19 +53,18 @@ pub struct ModuleGenerator<'a> {
 impl<'a> ModuleGenerator<'a> {
     ///
     pub fn new(wasm_binary: &'a [u8], options: &CodegenOptions) -> Self {
-        let llvm_context = Context::create();
+        let context = Context::create();
         let llvm_target_data = ModuleGenerator::create_target_data();
-        let llvm_builder = llvm_context.create_builder();
+        let builder = context.create_builder();
         let instance_context_type =
-            ModuleGenerator::create_instance_context_type(&llvm_context, &llvm_target_data);
+            ModuleGenerator::create_instance_context_type(&context, &llvm_target_data);
 
         Self {
-            llvm_context,
+            context,
             parser: Parser::new(&wasm_binary),
             instance_context_type,
-            runtime_data: ModuleData::new(),
-            llvm_builder,
-            llvm_func_types: Vec::new(),
+            builder,
+            function_types: Vec::new(),
             function_index: 0,
             options: *options,
         }
@@ -56,12 +74,17 @@ impl<'a> ModuleGenerator<'a> {
     fn create_target_data() -> TargetData {
         Target::initialize_native(&InitializationConfig::default())
             .expect("Unsuccessful initilalization of native target");
-        let target_triple = Target::normalize_target_triple(Target::get_default_triple());
-        let target = Target::from_triple(target_triple)
+
+        let target_triple = Target::get_default_triple().to_string();
+
+        let normalized_target_triple = Target::normalize_target_triple(&target_triple).to_string();
+
+        let target = Target::from_triple(&normalized_target_triple)
             .expect("Unsuccessful creation of target from triple");
+
         let target_machine = target
             .create_target_machine(
-                target_triple,
+                &target_triple,
                 "",
                 "",
                 OptimizationLevel::None,
@@ -72,23 +95,29 @@ impl<'a> ModuleGenerator<'a> {
         target_machine.get_target_data()
     }
 
-    /// Every local wasm function has an extra initial argument of type `*mut InstanceContext`
-    ///
-    /// ```fn (*mut InstanceContext, ...) -> ...```
-    ///
     /// This function creates an LLVM IR representing `*mut InstanceContext`.
     ///
-    /// The structure of InstanceContext:
+    /// All wasm functions take an initial argument of type `*mut InstanceContext`.
     ///
     /// ```
+    /// fn (*mut InstanceContext, ...) -> ...
+    /// ```
+    ///
+    /// Conceptually, InstanceContext has the following type. Although, we cannot express dynamic
+    /// arrays in Rust.
+    ///
+    /// ```rust
     /// struct InstanceContext {
-    ///     memories: *mut *mut u8,
-    ///     tables: *mut struct BoundPtr {
-    ///         base_ptr: *mut u32,
-    ///         size: usize,
-    ///     },
-    ///     globals: *mut *mut u64,
-    ///     functions: *mut *const (),
+    ///     memories_offset: usize,
+    ///     tables_offset: usize,
+    ///     globals_offset: usize,
+    ///     functions_offset: usize,
+    ///     intrinsic_function_offset: usize,
+    ///     memories: dyn [*mut u8; memory_count],
+    ///     tables: dyn [*mut u32; table_count],
+    ///     globals: dyn [*mut u64; global_count],
+    ///     functions: dyn [*const (); function_count],
+    ///     intrinsic_functions: dyn [*const (); intrinsic_function_count],
     /// }
     /// ```
     fn create_instance_context_type(context: &Context, target_data: &TargetData) -> PointerType {
@@ -128,8 +157,11 @@ impl<'a> ModuleGenerator<'a> {
     }
 
     ///
-    pub fn generate_module(&mut self) -> ParserResult<Module> {
-        let module = self.llvm_context.create_module("wasm");
+    pub fn generate_module(&mut self) -> ParserResult<(Module, ModuleData)> {
+        //
+        let mut module = self.context.create_module("wasm");
+        let mut runtime_data = ModuleData::new();
+        let reusables = Reusables::new(&self.context);
 
         loop {
             let state = self.parser.read();
@@ -138,6 +170,14 @@ impl<'a> ModuleGenerator<'a> {
                 // END
                 ParserState::EndWasm => {
                     verbose!("Parser ended!");
+                    // Generate `main` function.
+                    let mut function_codegen = FunctionGenerator::new();
+                    function_codegen.generate_main_function(
+                        &mut module,
+                        &self.builder,
+                        &self.context,
+                    )?;
+
                     break;
                 }
                 // ERRORS
@@ -150,9 +190,9 @@ impl<'a> ModuleGenerator<'a> {
                 // TYPE
                 ParserState::TypeSectionEntry(ty) => {
                     verbose!("type entry => {:?}", ty);
-                    self.runtime_data.add_type(Runtime::func_type(ty)?);
-                    self.llvm_func_types.push(LLVM::func_type(
-                        &self.llvm_context,
+                    runtime_data.add_type(Runtime::func_type(ty)?);
+                    self.function_types.push(LLVM::func_type(
+                        &self.context,
                         &self.instance_context_type,
                         ty,
                     )?);
@@ -160,13 +200,11 @@ impl<'a> ModuleGenerator<'a> {
                 // IMPORT
                 ParserState::ImportSectionEntry { module, field, ty } => {
                     debug!("import entry type => {:?}, {:?}, {:?}", module, field, ty);
-
                 }
                 // EXPORT
                 ParserState::ExportSectionEntry { field, kind, index } => {
                     debug!("export entry type => {:?}, {:?}, {:?}", field, kind, index);
-                    self.runtime_data
-                        .add_export(field.to_string(), Runtime::export(kind, *index));
+                    runtime_data.add_export(field.to_string(), Runtime::export(kind, *index));
                 }
                 // MEMORY
                 ParserState::MemorySectionEntry(ty) => {
@@ -225,27 +263,21 @@ impl<'a> ModuleGenerator<'a> {
                 }
                 // FUNCTION
                 ParserState::FunctionSectionEntry(type_index) => {
-                    self.runtime_data
-                        .add_function(FuncData::new(null() as _, *type_index));
+                    runtime_data.add_function(FuncData::new(null() as _, *type_index));
                 }
                 // FUNCTION BODY | CODE
                 ParserState::BeginFunctionBody { .. } => {
-                    let func_type = self.llvm_func_types[self.function_index as usize];
-
-                    let function = module.add_function("", func_type, None);
-
-                    let basic_block = function.append_basic_block("entry", &self.llvm_context);
-
-                    self.llvm_builder.position_at_end(&basic_block);
-
-                    let mut function_codegen = FunctionGenerator::new(
+                    // Generate function.
+                    let mut function_codegen = FunctionGenerator::new();
+                    function_codegen.generate_function(
+                        &mut module,
+                        &mut self.parser,
+                        &self.function_types,
+                        &self.builder,
+                        &self.context,
+                        &reusables,
                         self.function_index,
-                        function,
-                        &self.llvm_builder,
-                        &self.llvm_context,
-                    );
-
-                    function_codegen.generate_function(&mut self.parser)?;
+                    )?;
 
                     self.function_index += 1;
                 }
@@ -258,16 +290,6 @@ impl<'a> ModuleGenerator<'a> {
             println!("●{}●\n{}\n●{}●", delim, module, delim);
         }
 
-        Ok(module)
-    }
-
-    pub fn generate_main_function() -> FunctionValue {
-        // _main function
-        unimplemented!()
-    }
-
-    pub fn generate_initializers() -> FunctionValue {
-        // memories, tables, globals
-        unimplemented!()
+        Ok((module, runtime_data))
     }
 }

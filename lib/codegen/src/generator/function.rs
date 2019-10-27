@@ -1,10 +1,12 @@
-use wasmparser::{Parser, ParserState, WasmDecoder, Operator, FuncType};
-use wasmo_llvm::values::{FunctionValue, BasicValue, IntValue, FloatValue};
-use wasmo_llvm::types::{BasicType};
-use wasmo_llvm::{Builder, Context};
-use wasmo_utils::{verbose, debug};
 use crate::convert::LLVM;
+use super::module::Reusables;
+use wasmo_llvm::types::{fn_type, BasicType, FunctionType};
+use wasmo_llvm::values::{BasicValue, FloatValue, FunctionValue, IntValue};
+use wasmo_llvm::{Builder, Context, Module};
+use wasmo_utils::{debug, verbose};
+use wasmparser::{FuncType, Operator, Parser, ParserState, WasmDecoder};
 
+///
 #[derive(Debug)]
 struct Local {
     ty: BasicType,
@@ -13,101 +15,117 @@ struct Local {
 
 impl Local {
     fn new(ty: &BasicType) -> Self {
-        Self { ty: *ty,  current_ssa_reference: None }
+        Self {
+            ty: *ty,
+            current_ssa_reference: None,
+        }
     }
 }
 
-pub struct FunctionGenerator<'a> {
-    index: u32,
-    ir: FunctionValue,
-    llvm_builder: &'a Builder,
-    llvm_context: &'a Context,
+///
+pub struct FunctionGenerator {
     stack: Vec<BasicValue>,
     locals: Vec<Local>,
 }
 
-impl<'a> FunctionGenerator<'a> {
+impl FunctionGenerator {
     ///
-    pub fn new(
-        index: u32,
-        ir: FunctionValue,
-        llvm_builder: &'a Builder,
-        llvm_context: &'a Context
-    ) -> Self {
+    pub fn new() -> Self {
         Self {
-            index,
-            ir,
-            llvm_builder,
-            llvm_context,
             stack: Vec::new(),
             locals: Vec::new(),
         }
     }
 
     ///
-    pub fn generate_function<'b>(&mut self, parser: &mut Parser<'b>) -> Result<FunctionValue, &'static str> {
+    pub fn generate_function<'b>(
+        &mut self,
+        module: &mut Module,
+        parser: &mut Parser<'b>,
+        function_types: &[FunctionType],
+        builder: &Builder,
+        context: &Context,
+        reusables: &Reusables,
+        index: u32,
+    ) -> Result<(), &'static str> {
+        //
+        let function_type = function_types[index as usize];
+        let function = module.add_function("", function_type, None);
+        let basic_block = function.append_basic_block("entry", &context);
+        builder.position_at_end(&basic_block);
+
         loop {
+            //
             let state = parser.read();
 
             match state {
                 ParserState::EndFunctionBody => {
                     // Create a function return type from what's left on stack.
                     match self.stack.as_slice() {
-                        &[ value ] => self.llvm_builder.build_return(Some(value)),
-                        &[] => self.llvm_builder.build_return(None),
+                        &[value] => builder.build_return(Some(value)),
+                        &[] => builder.build_return(None),
                         _ => return Err("Multiple return values not supported yet"),
                     };
 
-                    break
-                },
+                    break;
+                }
                 ParserState::FunctionBodyLocals { locals } => {
                     // Get argument locals
-                    for ty in self.ir.get_type().as_ref().unwrap().get_param_types().iter() {
+                    for ty in function
+                        .get_type()
+                        .as_ref()
+                        .unwrap()
+                        .get_param_types()
+                        .iter()
+                    {
                         self.locals.push(Local::new(ty))
                     }
 
                     // Get body locals.
                     for data in locals.iter() {
                         for _ in 0..(data.0) {
-                            self.locals.push(
-                                Local::new(&LLVM::basic_type(self.llvm_context, &data.1)?)
-                            )
+                            self.locals
+                                .push(Local::new(&LLVM::basic_type(context, &data.1)?))
                         }
                     }
-                },
-                ParserState::CodeOperator(operator) => {
-                    self.generate_operator_code(operator)?;
-                },
-                _ => {
-                    break
                 }
+                ParserState::CodeOperator(operator) => {
+                    self.generate_operator_code(operator, &function, builder, context, reusables)?;
+                }
+                _ => break,
             };
         }
 
-        Ok(self.ir)
+        Ok(())
     }
 
     ///
-    pub fn generate_operator_code(&mut self, operator: &Operator) -> Result<(), &'static str> {
+    pub fn generate_operator_code(
+        &mut self,
+        operator: &Operator,
+        function: &FunctionValue,
+        builder: &Builder,
+        context: &Context,
+        reusables: &Reusables,
+    ) -> Result<(), &'static str> {
         match operator {
-            Operator::Unreachable => {},
-            Operator::Nop => {},
-            Operator::Block { ty } => {},
-            Operator::Loop { ty } => {},
-            Operator::If { ty } => {},
-            Operator::Else => {},
-            Operator::End => {},
-            Operator::Br { relative_depth } => {},
-            Operator::BrIf { relative_depth } => {},
-            Operator::BrTable { table } => {},
-            Operator::Return => {},
-            Operator::Call { function_index } => {
-            },
-            Operator::CallIndirect { index, table_index } => {},
+            Operator::Unreachable => {}
+            Operator::Nop => {}
+            Operator::Block { ty } => {}
+            Operator::Loop { ty } => {}
+            Operator::If { ty } => {}
+            Operator::Else => {}
+            Operator::End => {}
+            Operator::Br { relative_depth } => {}
+            Operator::BrIf { relative_depth } => {}
+            Operator::BrTable { table } => {}
+            Operator::Return => {}
+            Operator::Call { function_index } => {}
+            Operator::CallIndirect { index, table_index } => {}
             Operator::Drop => {
                 self.stack.pop();
-            },
-            Operator::Select => {},
+            }
+            Operator::Select => {}
             Operator::GetLocal { local_index } => {
                 // Skip the first instance_context_type param
                 let local_index = *local_index + 1;
@@ -117,18 +135,19 @@ impl<'a> FunctionGenerator<'a> {
                 if local.current_ssa_reference.is_none() {
                     local.current_ssa_reference = Some(
                         // If local is a param, get param, otherwise initialize to zero.
-                        if local_index < self.ir.count_params() {
-                            self.ir.get_nth_param(local_index).unwrap()
+                        if local_index < function.count_params() {
+                            function.get_nth_param(local_index).unwrap()
                         } else {
                             local.ty.zero(false)?
-                        }
+                        },
                     );
                 }
 
                 // Push value to stack.
                 // Guarantee: The checks above ensure local holds a basic value.
-                self.stack.push(*local.current_ssa_reference.as_ref().unwrap());
-            },
+                self.stack
+                    .push(*local.current_ssa_reference.as_ref().unwrap());
+            }
             Operator::SetLocal { local_index } => {
                 // Skip the first instance_context_type param
                 let local_index = *local_index + 1;
@@ -136,7 +155,7 @@ impl<'a> FunctionGenerator<'a> {
                 let stack_value = self.stack.pop().unwrap();
                 let local = &mut self.locals[local_index as usize];
                 local.current_ssa_reference = Some(stack_value);
-            },
+            }
             Operator::TeeLocal { local_index } => {
                 // Skip the first instance_context_type param
                 let local_index = *local_index + 1;
@@ -144,291 +163,315 @@ impl<'a> FunctionGenerator<'a> {
                 let stack_value = self.stack.last().unwrap();
                 let local = &mut self.locals[local_index as usize];
                 local.current_ssa_reference = Some(stack_value.clone());
-            },
-            Operator::GetGlobal { global_index } => {},
-            Operator::SetGlobal { global_index } => {},
-            Operator::I32Load { memarg } => {},
-            Operator::I64Load { memarg } => {},
-            Operator::F32Load { memarg } => {},
-            Operator::F64Load { memarg } => {},
-            Operator::I32Load8S { memarg } => {},
-            Operator::I32Load8U { memarg } => {},
-            Operator::I32Load16S { memarg } => {},
-            Operator::I32Load16U { memarg } => {},
-            Operator::I64Load8S { memarg } => {},
-            Operator::I64Load8U { memarg } => {},
-            Operator::I64Load16S { memarg } => {},
-            Operator::I64Load16U { memarg } => {},
-            Operator::I64Load32S { memarg } => {},
-            Operator::I64Load32U { memarg } => {},
-            Operator::I32Store { memarg } => {},
-            Operator::I64Store { memarg } => {},
-            Operator::F32Store { memarg } => {},
-            Operator::F64Store { memarg } => {},
-            Operator::I32Store8 { memarg } => {},
-            Operator::I32Store16 { memarg } => {},
-            Operator::I64Store8 { memarg } => {},
-            Operator::I64Store16 { memarg } => {},
-            Operator::I64Store32 { memarg } => {},
-            Operator::MemorySize { reserved } => {},
-            Operator::MemoryGrow { reserved } => {},
+            }
+            Operator::GetGlobal { global_index } => {}
+            Operator::SetGlobal { global_index } => {}
+            Operator::I32Load { memarg } => {}
+            Operator::I64Load { memarg } => {}
+            Operator::F32Load { memarg } => {}
+            Operator::F64Load { memarg } => {}
+            Operator::I32Load8S { memarg } => {}
+            Operator::I32Load8U { memarg } => {}
+            Operator::I32Load16S { memarg } => {}
+            Operator::I32Load16U { memarg } => {}
+            Operator::I64Load8S { memarg } => {}
+            Operator::I64Load8U { memarg } => {}
+            Operator::I64Load16S { memarg } => {}
+            Operator::I64Load16U { memarg } => {}
+            Operator::I64Load32S { memarg } => {}
+            Operator::I64Load32U { memarg } => {}
+            Operator::I32Store { memarg } => {}
+            Operator::I64Store { memarg } => {}
+            Operator::F32Store { memarg } => {}
+            Operator::F64Store { memarg } => {}
+            Operator::I32Store8 { memarg } => {}
+            Operator::I32Store16 { memarg } => {}
+            Operator::I64Store8 { memarg } => {}
+            Operator::I64Store16 { memarg } => {}
+            Operator::I64Store32 { memarg } => {}
+            Operator::MemorySize { reserved } => {}
+            Operator::MemoryGrow { reserved } => {}
             Operator::I32Const { value } => {
-                let value = self.llvm_context.i32_type().const_int(*value as _, false);
-                self.stack.push(BasicValue::IntValue(value));
-            },
+                let value: BasicValue = reusables.i32_type.const_int(*value as _, false).into();
+                self.stack.push(value);
+            }
             Operator::I64Const { value } => {
-                let value = self.llvm_context.i64_type().const_int(*value as _, false);
-                self.stack.push(BasicValue::IntValue(value));
-            },
+                let value: BasicValue = reusables.i64_type.const_int(*value as _, false).into();
+                self.stack.push(value);
+            }
             Operator::F32Const { value } => {
-                let value = self.llvm_context.f32_type().const_float((value.bits() as f32).into());
-                self.stack.push(BasicValue::FloatValue(value));
-            },
+                let value: BasicValue = reusables.f32_type.const_float((value.bits() as f32).into()).into();
+                self.stack.push(value);
+            }
             Operator::F64Const { value } => {
-                let value = self.llvm_context.f64_type().const_float(value.bits() as f64);
-                self.stack.push(BasicValue::FloatValue(value));
-            },
-            Operator::RefNull => {},
-            Operator::RefIsNull => {},
-            Operator::I32Eqz => {},
-            Operator::I32Eq => {},
-            Operator::I32Ne => {},
-            Operator::I32LtS => {},
-            Operator::I32LtU => {},
-            Operator::I32GtS => {},
-            Operator::I32GtU => {},
-            Operator::I32LeS => {},
-            Operator::I32LeU => {},
-            Operator::I32GeS => {},
-            Operator::I32GeU => {},
-            Operator::I64Eqz => {},
-            Operator::I64Eq => {},
-            Operator::I64Ne => {},
-            Operator::I64LtS => {},
-            Operator::I64LtU => {},
-            Operator::I64GtS => {},
-            Operator::I64GtU => {},
-            Operator::I64LeS => {},
-            Operator::I64LeU => {},
-            Operator::I64GeS => {},
-            Operator::I64GeU => {},
-            Operator::F32Eq => {},
-            Operator::F32Ne => {},
-            Operator::F32Lt => {},
-            Operator::F32Gt => {},
-            Operator::F32Le => {},
-            Operator::F32Ge => {},
-            Operator::F64Eq => {},
-            Operator::F64Ne => {},
-            Operator::F64Lt => {},
-            Operator::F64Gt => {},
-            Operator::F64Le => {},
-            Operator::F64Ge => {},
-            Operator::I32Clz => {},
-            Operator::I32Ctz => {},
-            Operator::I32Popcnt => {},
+                let value: BasicValue = reusables.f64_type.const_float(value.bits() as f64).into();
+                self.stack.push(value);
+            }
+            Operator::RefNull => {}
+            Operator::RefIsNull => {}
+            Operator::I32Eqz => {}
+            Operator::I32Eq => {}
+            Operator::I32Ne => {}
+            Operator::I32LtS => {}
+            Operator::I32LtU => {}
+            Operator::I32GtS => {}
+            Operator::I32GtU => {}
+            Operator::I32LeS => {}
+            Operator::I32LeU => {}
+            Operator::I32GeS => {}
+            Operator::I32GeU => {}
+            Operator::I64Eqz => {}
+            Operator::I64Eq => {}
+            Operator::I64Ne => {}
+            Operator::I64LtS => {}
+            Operator::I64LtU => {}
+            Operator::I64GtS => {}
+            Operator::I64GtU => {}
+            Operator::I64LeS => {}
+            Operator::I64LeU => {}
+            Operator::I64GeS => {}
+            Operator::I64GeU => {}
+            Operator::F32Eq => {}
+            Operator::F32Ne => {}
+            Operator::F32Lt => {}
+            Operator::F32Gt => {}
+            Operator::F32Le => {}
+            Operator::F32Ge => {}
+            Operator::F64Eq => {}
+            Operator::F64Ne => {}
+            Operator::F64Lt => {}
+            Operator::F64Gt => {}
+            Operator::F64Le => {}
+            Operator::F64Ge => {}
+            Operator::I32Clz => {}
+            Operator::I32Ctz => {}
+            Operator::I32Popcnt => {}
             Operator::I32Add => {
                 // Guarantee: parser already type checked stack values.
-                let value = self.llvm_builder.build_int_add(
-                    self.stack.pop().unwrap().into(),
-                    self.stack.pop().unwrap().into(),
-                    "i32.add"
-                );
-                self.stack.push(BasicValue::IntValue(value));
-            },
+                let value: BasicValue = builder
+                    .build_int_add::<IntValue>(
+                        self.stack.pop().unwrap().into(),
+                        self.stack.pop().unwrap().into(),
+                        "i32.add",
+                    )
+                    .into();
+                self.stack.push(value);
+            }
             Operator::I32Sub => {
                 // Guarantee: parser already type checked stack values.
-                let value = self.llvm_builder.build_int_sub(
-                    self.stack.pop().unwrap().into(),
-                    self.stack.pop().unwrap().into(),
-                    "i32.sub"
-                );
-                self.stack.push(BasicValue::IntValue(value));
-            },
+                let value: BasicValue = builder
+                    .build_int_sub::<IntValue>(
+                        self.stack.pop().unwrap().into(),
+                        self.stack.pop().unwrap().into(),
+                        "i32.sub",
+                    )
+                    .into();
+                self.stack.push(value);
+            }
             Operator::I32Mul => {
                 // Guarantee: parser already type checked stack values.
-                let value = self.llvm_builder.build_int_mul(
-                    self.stack.pop().unwrap().into(),
-                    self.stack.pop().unwrap().into(),
-                    "i32.mul"
-                );
-                self.stack.push(BasicValue::IntValue(value));
-            },
+                let value: BasicValue = builder
+                    .build_int_mul::<IntValue>(
+                        self.stack.pop().unwrap().into(),
+                        self.stack.pop().unwrap().into(),
+                        "i32.mul",
+                    )
+                    .into();
+                self.stack.push(value);
+            }
             Operator::I32DivS => {
                 // Div by zero checks!
-            },
-            Operator::I32DivU => {},
-            Operator::I32RemS => {},
-            Operator::I32RemU => {},
-            Operator::I32And => {},
-            Operator::I32Or => {},
-            Operator::I32Xor => {},
-            Operator::I32Shl => {},
-            Operator::I32ShrS => {},
-            Operator::I32ShrU => {},
-            Operator::I32Rotl => {},
-            Operator::I32Rotr => {},
-            Operator::I64Clz => {},
-            Operator::I64Ctz => {},
-            Operator::I64Popcnt => {},
+            }
+            Operator::I32DivU => {}
+            Operator::I32RemS => {}
+            Operator::I32RemU => {}
+            Operator::I32And => {}
+            Operator::I32Or => {}
+            Operator::I32Xor => {}
+            Operator::I32Shl => {}
+            Operator::I32ShrS => {}
+            Operator::I32ShrU => {}
+            Operator::I32Rotl => {}
+            Operator::I32Rotr => {}
+            Operator::I64Clz => {}
+            Operator::I64Ctz => {}
+            Operator::I64Popcnt => {}
             Operator::I64Add => {
                 // Guarantee: parser already type checked stack values.
-                let value = self.llvm_builder.build_int_add(
-                    self.stack.pop().unwrap().into(),
-                    self.stack.pop().unwrap().into(),
-                    "i64.add"
-                );
-                self.stack.push(BasicValue::IntValue(value));
-            },
+                let value: BasicValue = builder
+                    .build_int_add::<IntValue>(
+                        self.stack.pop().unwrap().into(),
+                        self.stack.pop().unwrap().into(),
+                        "i64.add",
+                    )
+                    .into();
+                self.stack.push(value);
+            }
             Operator::I64Sub => {
                 // Guarantee: parser already type checked stack values.
-                let value = self.llvm_builder.build_int_sub(
-                    self.stack.pop().unwrap().into(),
-                    self.stack.pop().unwrap().into(),
-                    "i64.sub"
-                );
-                self.stack.push(BasicValue::IntValue(value));
-            },
+                let value: BasicValue = builder
+                    .build_int_sub::<IntValue>(
+                        self.stack.pop().unwrap().into(),
+                        self.stack.pop().unwrap().into(),
+                        "i64.sub",
+                    )
+                    .into();
+                self.stack.push(value);
+            }
             Operator::I64Mul => {
                 // Guarantee: parser already type checked stack values.
-                let value = self.llvm_builder.build_int_mul(
-                    self.stack.pop().unwrap().into(),
-                    self.stack.pop().unwrap().into(),
-                    "i64.mul"
-                );
-                self.stack.push(BasicValue::IntValue(value));
-            },
-            Operator::I64DivS => {},
-            Operator::I64DivU => {},
-            Operator::I64RemS => {},
-            Operator::I64RemU => {},
-            Operator::I64And => {},
-            Operator::I64Or => {},
-            Operator::I64Xor => {},
-            Operator::I64Shl => {},
-            Operator::I64ShrS => {},
-            Operator::I64ShrU => {},
-            Operator::I64Rotl => {},
-            Operator::I64Rotr => {},
-            Operator::F32Abs => {},
-            Operator::F32Neg => {},
-            Operator::F32Ceil => {},
-            Operator::F32Floor => {},
-            Operator::F32Trunc => {},
-            Operator::F32Nearest => {},
-            Operator::F32Sqrt => {},
+                let value: BasicValue = builder
+                    .build_int_mul::<IntValue>(
+                        self.stack.pop().unwrap().into(),
+                        self.stack.pop().unwrap().into(),
+                        "i64.mul",
+                    )
+                    .into();
+                self.stack.push(value);
+            }
+            Operator::I64DivS => {}
+            Operator::I64DivU => {}
+            Operator::I64RemS => {}
+            Operator::I64RemU => {}
+            Operator::I64And => {}
+            Operator::I64Or => {}
+            Operator::I64Xor => {}
+            Operator::I64Shl => {}
+            Operator::I64ShrS => {}
+            Operator::I64ShrU => {}
+            Operator::I64Rotl => {}
+            Operator::I64Rotr => {}
+            Operator::F32Abs => {}
+            Operator::F32Neg => {}
+            Operator::F32Ceil => {}
+            Operator::F32Floor => {}
+            Operator::F32Trunc => {}
+            Operator::F32Nearest => {}
+            Operator::F32Sqrt => {}
             Operator::F32Add => {
                 // Guarantee: parser already type checked stack values.
-                let value = self.llvm_builder.build_float_add(
-                    self.stack.pop().unwrap().into(),
-                    self.stack.pop().unwrap().into(),
-                    "f32.add"
-                );
-                self.stack.push(BasicValue::FloatValue(value));
-            },
+                let value: BasicValue = builder
+                    .build_float_add::<FloatValue>(
+                        self.stack.pop().unwrap().into(),
+                        self.stack.pop().unwrap().into(),
+                        "f32.add",
+                    )
+                    .into();
+                self.stack.push(value);
+            }
             Operator::F32Sub => {
                 // Guarantee: parser already type checked stack values.
-                let value = self.llvm_builder.build_float_sub(
-                    self.stack.pop().unwrap().into(),
-                    self.stack.pop().unwrap().into(),
-                    "f32.sub"
-                );
-                self.stack.push(BasicValue::FloatValue(value));
-            },
+                let value: BasicValue = builder
+                    .build_float_sub::<FloatValue>(
+                        self.stack.pop().unwrap().into(),
+                        self.stack.pop().unwrap().into(),
+                        "f32.sub",
+                    )
+                    .into();
+                self.stack.push(value);
+            }
             Operator::F32Mul => {
                 // Guarantee: parser already type checked stack values.
-                let value = self.llvm_builder.build_float_mul(
-                    self.stack.pop().unwrap().into(),
-                    self.stack.pop().unwrap().into(),
-                    "f32.mul"
-                );
-                self.stack.push(BasicValue::FloatValue(value));
-            },
-            Operator::F32Div => {},
-            Operator::F32Min => {},
-            Operator::F32Max => {},
-            Operator::F32Copysign => {},
-            Operator::F64Abs => {},
-            Operator::F64Neg => {},
-            Operator::F64Ceil => {},
-            Operator::F64Floor => {},
-            Operator::F64Trunc => {},
-            Operator::F64Nearest => {},
-            Operator::F64Sqrt => {},
+                let value: BasicValue = builder
+                    .build_float_mul::<FloatValue>(
+                        self.stack.pop().unwrap().into(),
+                        self.stack.pop().unwrap().into(),
+                        "f32.mul",
+                    )
+                    .into();
+                self.stack.push(value);
+            }
+            Operator::F32Div => {}
+            Operator::F32Min => {}
+            Operator::F32Max => {}
+            Operator::F32Copysign => {}
+            Operator::F64Abs => {}
+            Operator::F64Neg => {}
+            Operator::F64Ceil => {}
+            Operator::F64Floor => {}
+            Operator::F64Trunc => {}
+            Operator::F64Nearest => {}
+            Operator::F64Sqrt => {}
             Operator::F64Add => {
                 // Guarantee: parser already type checked stack values.
-                let value = self.llvm_builder.build_float_add(
-                    self.stack.pop().unwrap().into(),
-                    self.stack.pop().unwrap().into(),
-                    "f64.add"
-                );
-                self.stack.push(BasicValue::FloatValue(value));
-            },
+                let value: BasicValue = builder
+                    .build_float_add::<FloatValue>(
+                        self.stack.pop().unwrap().into(),
+                        self.stack.pop().unwrap().into(),
+                        "f64.add",
+                    )
+                    .into();
+                self.stack.push(value);
+            }
             Operator::F64Sub => {
                 // Guarantee: parser already type checked stack values.
-                let value = self.llvm_builder.build_float_sub(
-                    self.stack.pop().unwrap().into(),
-                    self.stack.pop().unwrap().into(),
-                    "f64.sub"
-                );
-                self.stack.push(BasicValue::FloatValue(value));
-            },
+                let value: BasicValue = builder
+                    .build_float_sub::<FloatValue>(
+                        self.stack.pop().unwrap().into(),
+                        self.stack.pop().unwrap().into(),
+                        "f64.sub",
+                    )
+                    .into();
+                self.stack.push(value);
+            }
             Operator::F64Mul => {
                 // Guarantee: parser already type checked stack values.
-                let value = self.llvm_builder.build_float_sub(
-                    self.stack.pop().unwrap().into(),
-                    self.stack.pop().unwrap().into(),
-                    "f32.mul"
-                );
-                self.stack.push(BasicValue::FloatValue(value));
-            },
+                let value: BasicValue = builder
+                    .build_float_sub::<FloatValue>(
+                        self.stack.pop().unwrap().into(),
+                        self.stack.pop().unwrap().into(),
+                        "f32.mul",
+                    )
+                    .into();
+                self.stack.push(value);
+            }
             Operator::F64Div => {
                 // Div by zero checks!
-            },
-            Operator::F64Min => {},
-            Operator::F64Max => {},
-            Operator::F64Copysign => {},
-            Operator::I32WrapI64 => {},
-            Operator::I32TruncSF32 => {},
-            Operator::I32TruncUF32 => {},
-            Operator::I32TruncSF64 => {},
-            Operator::I32TruncUF64 => {},
-            Operator::I64ExtendSI32 => {},
-            Operator::I64ExtendUI32 => {},
-            Operator::I64TruncSF32 => {},
-            Operator::I64TruncUF32 => {},
-            Operator::I64TruncSF64 => {},
-            Operator::I64TruncUF64 => {},
-            Operator::F32ConvertSI32 => {},
-            Operator::F32ConvertUI32 => {},
-            Operator::F32ConvertSI64 => {},
-            Operator::F32ConvertUI64 => {},
-            Operator::F32DemoteF64 => {},
-            Operator::F64ConvertSI32 => {},
-            Operator::F64ConvertUI32 => {},
-            Operator::F64ConvertSI64 => {},
-            Operator::F64ConvertUI64 => {},
-            Operator::F64PromoteF32 => {},
-            Operator::I32ReinterpretF32 => {},
-            Operator::I64ReinterpretF64 => {},
-            Operator::F32ReinterpretI32 => {},
-            Operator::F64ReinterpretI64 => {},
-            Operator::I32Extend8S => {},
-            Operator::I32Extend16S => {},
-            Operator::I64Extend8S => {},
-            Operator::I64Extend16S => {},
-            Operator::I64Extend32S => {},
+            }
+            Operator::F64Min => {}
+            Operator::F64Max => {}
+            Operator::F64Copysign => {}
+            Operator::I32WrapI64 => {}
+            Operator::I32TruncSF32 => {}
+            Operator::I32TruncUF32 => {}
+            Operator::I32TruncSF64 => {}
+            Operator::I32TruncUF64 => {}
+            Operator::I64ExtendSI32 => {}
+            Operator::I64ExtendUI32 => {}
+            Operator::I64TruncSF32 => {}
+            Operator::I64TruncUF32 => {}
+            Operator::I64TruncSF64 => {}
+            Operator::I64TruncUF64 => {}
+            Operator::F32ConvertSI32 => {}
+            Operator::F32ConvertUI32 => {}
+            Operator::F32ConvertSI64 => {}
+            Operator::F32ConvertUI64 => {}
+            Operator::F32DemoteF64 => {}
+            Operator::F64ConvertSI32 => {}
+            Operator::F64ConvertUI32 => {}
+            Operator::F64ConvertSI64 => {}
+            Operator::F64ConvertUI64 => {}
+            Operator::F64PromoteF32 => {}
+            Operator::I32ReinterpretF32 => {}
+            Operator::I64ReinterpretF64 => {}
+            Operator::F32ReinterpretI32 => {}
+            Operator::F64ReinterpretI64 => {}
+            Operator::I32Extend8S => {}
+            Operator::I32Extend16S => {}
+            Operator::I64Extend8S => {}
+            Operator::I64Extend16S => {}
+            Operator::I64Extend32S => {}
 
             // 0xFC operators
             // Non-trapping Float-to-int Conversions
-            Operator::I32TruncSSatF32 => {},
-            Operator::I32TruncUSatF32 => {},
-            Operator::I32TruncSSatF64 => {},
-            Operator::I32TruncUSatF64 => {},
-            Operator::I64TruncSSatF32 => {},
-            Operator::I64TruncUSatF32 => {},
-            Operator::I64TruncSSatF64 => {},
-            Operator::I64TruncUSatF64 => {},
+            Operator::I32TruncSSatF32 => {}
+            Operator::I32TruncUSatF32 => {}
+            Operator::I32TruncSSatF64 => {}
+            Operator::I32TruncUSatF64 => {}
+            Operator::I64TruncSSatF32 => {}
+            Operator::I64TruncUSatF32 => {}
+            Operator::I64TruncSSatF64 => {}
+            Operator::I64TruncUSatF64 => {}
 
             // 0xFC operators
             // bulk memory https://github.com/WebAssembly/bulk-memory-operations/blob/master/proposals/bulk-memory-operations/Overview.md
@@ -665,5 +708,45 @@ impl<'a> FunctionGenerator<'a> {
 
         Ok(())
     }
-}
 
+    ///
+    pub fn generate_main_function(
+        &mut self,
+        module: &mut Module,
+        builder: &Builder,
+        context: &Context,
+    ) -> Result<(), &'static str> {
+        //
+        let function_type = fn_type(&[], context.void_type().into(), true);
+        let function = module.add_function("main", function_type, None);
+        let basic_block = function.append_basic_block("entry", &context);
+        builder.position_at_end(&basic_block);
+
+        // FunctionGenerator::generate_initializers();
+
+        builder.build_return(None);
+
+        Ok(())
+    }
+
+    ///
+    pub fn generate_main_function_body() {
+        // CREATIONS
+        // Create memories -> call mmap(...) dynamic libc.dylib | call VirtualAlloc(...) dynamic win32.dll
+        // Create global -> build_global
+        // Create tables -> call mmap(...) dynamic libc.dylib | call VirtualAlloc(...) dynamic win32.dll
+
+        // INITIALIZATIONS
+        // initialize memories -> loop and place const values
+        // initialize tables -> loop and place const values
+
+        // INSTANCECONTEXT
+        // create global -> build_global instancecontext
+        // assign to instancecontext -> assign pointer values from CREATIONS to fields
+        // assign to instancecontext.functions -> get address of each function
+
+        // START
+        // Call start -> call start
+        unimplemented!()
+    }
+}

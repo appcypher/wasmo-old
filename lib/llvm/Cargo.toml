@@ -15,4 +15,9 @@ homepage = "https://github.com/appcypher/wasmo"
 
 [dependencies]
 llvm-sys = "80"
+libc = "0.2.65"
 wasmo-utils = { path = "../utils" }
+
+[features]
+debug = []
+verbose = []
