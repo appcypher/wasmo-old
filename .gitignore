@@ -4,3 +4,4 @@ target/
 .random/
 .env
 **symbols.txt
+**.ll
