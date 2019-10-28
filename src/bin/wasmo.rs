@@ -1,9 +1,10 @@
-use std::env;
-mod utils;
+#[macro_use]
+extern crate wasmo_utils;
+mod args;
 
-use wasmo_utils::verbose;
-use utils::Arguments;
+use args::ArgumentsHandler;
 
-fn main() {
-    Arguments::new();
+fn main() -> Result<(), String> {
+    ArgumentsHandler::new().setup()?;
+    Ok(())
 }

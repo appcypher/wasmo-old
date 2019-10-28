@@ -38,9 +38,7 @@ impl FunctionType {
     }
 
     pub fn get_return_type(&self) -> BasicType {
-        unsafe {
-            BasicType::new(LLVMGetReturnType(self.ty.ty))
-        }
+        unsafe { BasicType::new(LLVMGetReturnType(self.ty.ty)) }
     }
 
     pub fn ptr_type(&self, address_space: &AddressSpace) -> PointerType {
@@ -54,18 +52,17 @@ impl AsTypeRef for FunctionType {
     }
 }
 
-pub fn fn_type(
+pub fn function_type(
     param_types: &[BasicType],
     return_type: BasicType,
     is_varargs: bool,
 ) -> FunctionType {
-    let mut param_types: Vec<LLVMTypeRef> = param_types.iter().map(|ty| ty.as_ref()).collect();
-    let return_type = return_type.as_ref();
-    println!("param_types = {}", param_types.len());
+    let mut llvm_param_types: Vec<LLVMTypeRef> = param_types.iter().map(|ty| ty.as_ref()).collect();
+    let llvm_return_type = return_type.as_ref();
     let ty = unsafe {
         LLVMFunctionType(
-            return_type,
-            param_types.as_mut_ptr(),
+            llvm_return_type,
+            llvm_param_types.as_mut_ptr(),
             param_types.len() as _,
             is_varargs as _,
         )

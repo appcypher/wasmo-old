@@ -2,7 +2,7 @@
 
 use wasmo_utils::debug;
 
-use wasmo_llvm::types::{fn_type, BasicType};
+use wasmo_llvm::types::{function_type, BasicType};
 use wasmo_llvm::values::IntValue;
 use wasmo_llvm::{
     Builder, CompilerResult, Context, ExecutionEngine, Func, Module, OptimizationLevel,
@@ -46,7 +46,7 @@ unsafe fn jit_compile_sum(
 ) -> CompilerResult<Func<SumFunc>> {
     let i64_type: BasicType = context.i64_type().into();
 
-    let func_type = fn_type(&[i64_type, i64_type, i64_type], i64_type, false);
+    let func_type = function_type(&[i64_type, i64_type, i64_type], i64_type, false);
 
     let function = module.add_function("sum", func_type, None);
 

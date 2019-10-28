@@ -13,7 +13,7 @@ mod void;
 pub use array::ArrayType;
 pub use enums::BasicType;
 pub use float::FloatType;
-pub use function::{fn_type, FunctionType};
+pub use function::{function_type, FunctionType};
 pub use int::IntType;
 pub use pointer::PointerType;
 pub use struct_::StructType;

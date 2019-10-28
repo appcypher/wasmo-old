@@ -10,7 +10,7 @@ use crate::{
 use std::ptr::null;
 use wasmo_llvm::target::{Target, TargetData};
 use wasmo_llvm::types::{
-    fn_type, BasicType, FloatType, FunctionType, IntType, PointerType, StructType,
+    function_type, BasicType, FloatType, FunctionType, IntType, PointerType, StructType,
 };
 use wasmo_llvm::values::{BasicValue, FloatValue, FunctionValue, InstructionValue, IntValue};
 use wasmo_llvm::{AddressSpace, BasicBlock, Builder, Context, InitializationConfig, Module};
@@ -21,6 +21,7 @@ use wasmparser::{FuncType, Operator, Parser, ParserState, WasmDecoder};
 
 ///
 pub struct Reusables {
+    pub(crate) i8_type: IntType,
     pub(crate) i32_type: IntType,
     pub(crate) i64_type: IntType,
     pub(crate) f32_type: FloatType,
@@ -31,6 +32,7 @@ impl Reusables {
     ///
     fn new(context: &Context) -> Self {
         Self {
+            i8_type: context.i8_type(),
             i32_type: context.i32_type(),
             i64_type: context.i64_type(),
             f32_type: context.f32_type(),
@@ -48,6 +50,7 @@ pub struct ModuleGenerator<'a> {
     function_types: Vec<FunctionType>,
     function_index: u32,
     options: CodegenOptions,
+    reusables: Reusables,
 }
 
 impl<'a> ModuleGenerator<'a> {
@@ -56,8 +59,9 @@ impl<'a> ModuleGenerator<'a> {
         let context = Context::create();
         let llvm_target_data = ModuleGenerator::create_target_data();
         let builder = context.create_builder();
+        let reusables = Reusables::new(&context);
         let instance_context_type =
-            ModuleGenerator::create_instance_context_type(&context, &llvm_target_data);
+            ModuleGenerator::create_instance_context_type(&context, &reusables, &llvm_target_data, );
 
         Self {
             context,
@@ -67,6 +71,7 @@ impl<'a> ModuleGenerator<'a> {
             function_types: Vec::new(),
             function_index: 0,
             options: *options,
+            reusables,
         }
     }
 
@@ -120,7 +125,7 @@ impl<'a> ModuleGenerator<'a> {
     ///     intrinsic_functions: dyn [*const (); intrinsic_function_count],
     /// }
     /// ```
-    fn create_instance_context_type(context: &Context, target_data: &TargetData) -> PointerType {
+    fn create_instance_context_type(context: &Context, reusables: &Reusables, target_data: &TargetData) -> PointerType {
         let address_space = &AddressSpace::Global;
         let bound_ptr_ty = context.struct_type_with_name(
             "BoundPtr",
@@ -130,19 +135,19 @@ impl<'a> ModuleGenerator<'a> {
             ],
             false,
         );
-        let memories_ty: BasicType = context
-            .i8_type()
+        let memories_ty: BasicType = reusables
+            .i8_type
             .ptr_type(address_space)
             .ptr_type(address_space)
             .into(); // *mut *mut u8
         let tables_ty: BasicType = bound_ptr_ty.ptr_type(address_space).into(); // *mut struct BoundPtr
-        let globals_ty: BasicType = context
-            .i64_type()
+        let globals_ty: BasicType = reusables
+            .i64_type
             .ptr_type(address_space)
             .ptr_type(address_space)
             .into(); // *mut *mut u64
-        let functions_ty: BasicType = context
-            .i8_type()
+        let functions_ty: BasicType = reusables
+            .i8_type
             .ptr_type(address_space)
             .ptr_type(address_space)
             .into(); // *mut *const i8 // LLVM doesn't like void pointers
@@ -161,7 +166,6 @@ impl<'a> ModuleGenerator<'a> {
         //
         let mut module = self.context.create_module("wasm");
         let mut runtime_data = ModuleData::new();
-        let reusables = Reusables::new(&self.context);
 
         loop {
             let state = self.parser.read();
@@ -176,6 +180,7 @@ impl<'a> ModuleGenerator<'a> {
                         &mut module,
                         &self.builder,
                         &self.context,
+                        &self.reusables,
                     )?;
 
                     break;
@@ -275,7 +280,7 @@ impl<'a> ModuleGenerator<'a> {
                         &self.function_types,
                         &self.builder,
                         &self.context,
-                        &reusables,
+                        &self.reusables,
                         self.function_index,
                     )?;
 

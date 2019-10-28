@@ -1,6 +1,6 @@
-use crate::convert::LLVM;
 use super::module::Reusables;
-use wasmo_llvm::types::{fn_type, BasicType, FunctionType};
+use crate::convert::LLVM;
+use wasmo_llvm::types::{function_type, BasicType, FunctionType};
 use wasmo_llvm::values::{BasicValue, FloatValue, FunctionValue, IntValue};
 use wasmo_llvm::{Builder, Context, Module};
 use wasmo_utils::{debug, verbose};
@@ -200,7 +200,10 @@ impl FunctionGenerator {
                 self.stack.push(value);
             }
             Operator::F32Const { value } => {
-                let value: BasicValue = reusables.f32_type.const_float((value.bits() as f32).into()).into();
+                let value: BasicValue = reusables
+                    .f32_type
+                    .const_float((value.bits() as f32).into())
+                    .into();
                 self.stack.push(value);
             }
             Operator::F64Const { value } => {
@@ -715,22 +718,17 @@ impl FunctionGenerator {
         module: &mut Module,
         builder: &Builder,
         context: &Context,
+        reusables: &Reusables,
     ) -> Result<(), &'static str> {
         //
-        let function_type = fn_type(&[], context.void_type().into(), true);
+        let function_type = function_type(&[], reusables.i32_type.into(), false);
         let function = module.add_function("main", function_type, None);
         let basic_block = function.append_basic_block("entry", &context);
+
         builder.position_at_end(&basic_block);
 
-        // FunctionGenerator::generate_initializers();
+        // TODO: Abstraction ahead!
 
-        builder.build_return(None);
-
-        Ok(())
-    }
-
-    ///
-    pub fn generate_main_function_body() {
         // CREATIONS
         // Create memories -> call mmap(...) dynamic libc.dylib | call VirtualAlloc(...) dynamic win32.dll
         // Create global -> build_global
@@ -747,6 +745,9 @@ impl FunctionGenerator {
 
         // START
         // Call start -> call start
-        unimplemented!()
+
+        builder.build_return(Some(reusables.i32_type.const_int(0, false).into()));
+
+        Ok(())
     }
 }

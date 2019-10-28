@@ -1,20 +1,19 @@
 //! USAGE: cargo run --example codegen --features "verbose"
 
-mod utils;
-use wasmo_utils::{file::{read_file_bytes, wat2wasm}, verbose};
-use wasmo_codegen::generator::{ModuleGenerator};
-use wasmo_codegen::options::{CodegenOptions};
-use utils::project_path;
-use wasmo_runtime::module::{ModuleAOT, Module};
-use wasmo_runtime::options::{Options};
-
+use wasmo_codegen::generator::ModuleGenerator;
+use wasmo_codegen::options::CodegenOptions;
+use wasmo_runtime::module::{Module, ModuleAOT};
+use wasmo_runtime::options::Options;
+use wasmo_utils::file::convert_wat_to_wasm;
+use wasmo_utils::path::project_path;
+use wasmo_utils::verbose;
 
 fn main() {
     verbose!("\n=== [ codegen_example ] ===\n");
 
-    let wat_filename = project_path("examples/wat/valid/func-body.wat");
+    let wat_file_path = project_path("examples/wat/valid/func-body.wat");
 
-    let wasm_binary = match wat2wasm(wat_filename.as_str()) {
+    let wasm_binary = match convert_wat_to_wasm(&wat_file_path) {
         Err(error) => panic!("Conversion Error! = {:?}", error),
         Ok(binary) => binary,
     };
@@ -30,7 +29,7 @@ fn main() {
             verbose!("LLVM Module generated! = {:?}", result.0);
             verbose!("Runtime Module Data generated! = {:?}", result.1);
             result
-        },
+        }
     };
 
     let options = &Options::default();
@@ -39,7 +38,5 @@ fn main() {
 
     verbose!("Runtime Module generated! = {:?}", module);
 
-
     verbose!("\n=== [ codegen_example ] ===\n");
 }
-
