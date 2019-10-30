@@ -9,7 +9,7 @@
 
 --------------
 
-### GOALS
+### <sup><sup>🚀</sup></sup> GOALS
 - Useable as a standalone WebAssembly runtime.
 - Can serve as a backend for languages compiling to WebAssembly.
 - Provide options for taking advantage of the LLVM backend with JIT and AOT support.
@@ -18,25 +18,91 @@
 
 --------------
 
-### BUILDING THE PROJECT
-<details>
-  <summary>...</summary>
-  - Stay tuned!
+### <sup><sup>🛠</sup></sup> BUILDING THE PROJECT
+#### REQUIREMENTS
+  - Rust and Cargo
 
-</details>
+    Rust and Cargo can be installed by following the instructions [here](https://doc.rust-lang.org/cargo/getting-started/installation.html)
+
+  - LLVM 8.0.1
+
+    You can download an LLVM installer for Windows or pre-compiled binaries for your Unix platform [here](https://github.com/llvm/llvm-project/releases/tag/llvmorg-8.0.1)
+
+
+#### STEPS
+  - Clone the repository.
+
+    ```
+    git clone https://github.com/appcypher/wasmo.git
+    ```
+
+  - Change directory
+
+    ```
+    cd wasmo
+    ```
+
+  - Create an `LLVM_SYS_80_PREFIX` environment variable and set its value to your installed LLVM path. The syntax for this depends on the shell you are using
+
+    <details>
+      <summary>Read more</summary>
+
+      - POSIX (BASH, ZSH, ...)
+
+        ```
+        export LLVM_SYS_80_PREFIX="/path/to/llvm"
+        ```
+
+      - FISH
+
+        ```
+        setenv LLVM_SYS_80_PREFIX "/path/to/llvm"
+        ```
+
+      - CMD [WINDOWS]
+
+        ```
+        set LLVM_SYS_80_PREFIX="/path/to/llvm"
+        ```
+
+      - POWERSHELL [WINDOWS]
+
+        ```
+        setx LLVM_SYS_80_PREFIX "/path/to/llvm"
+        ```
+
+      </details>
+
+  - Build the project
+
+    ```
+    cargo build
+    ```
+
+  - Run wasmo executable
+
+    ```
+    target/debug/wasmo --help
+    ```
 
 --------------
 
-### USAGE
-<details>
-  <summary>...</summary>
-  - Stay tuned!
+### <sup><sup>▶️</sup></sup> USAGE
+- Run a WebAssembly file _<sup><sup>WIP<sup></sup>_
 
-</details>
+  ```
+  target/debug/wasmo sample.wasm
+  ```
+
+- Print help messages
+
+  ```
+  target/debug/wasmo --help
+  ```
 
 --------------
 
-### API (Susceptible to Change!)
+### <sup><sup>↔️</sup></sup> API _<sup><sup>WIP<sup></sup>_
 ```rust
 // AOT
 let module: ModuleAOT = Module::create_aot(&wasm_code);
@@ -55,5 +121,5 @@ instance.execute(&args)?;
 
 --------------
 
-### ATTRIBUTIONS
+### <sup><sup>👍</sup></sup> ATTRIBUTIONS
 - [Inkwell](https://github.com/TheDan64/inkwell) [Apache-2.0] - Inkwell provides a type-safe interface for [llvm-sys](https://bitbucket.org/tari/llvm-sys.rs), and this project's llvm library is mostly based on it.

@@ -42,11 +42,11 @@ main() {
 #	Prints helpful information about the setup script
 help() {
     echo ""
-    echo " =========================== lite ==============================="
+    echo " =========================== wasmo-setup ==============================="
     echo "|                                                                |"
     echo "|     A simple utility for managing wasmo installs            |"
     echo "|                                                                |"
-    echo "| [USAGE] : lite [comand]                                        |"
+    echo "| [USAGE] : wasmo-setup [comand]                                        |"
     echo "| [COMMAND] :                                                    |"
     echo "|  • help       - prints this help message                       |"
     echo "|  • install    - builds project and exposes relevant commands   |"
@@ -81,8 +81,8 @@ install() {
         add_link "wasmo" $wasmo_path
     fi
 
-    if [ ! -f "$usr_prefix/lite" ]; then
-        add_link "lite" $script_path
+    if [ ! -f "$usr_prefix/wasmo-setup" ]; then
+        add_link "wasmo-setup" $script_path
     fi
 }
 
@@ -101,7 +101,7 @@ uninstall() {
 
     displayln "Remove commands"
     remove_link "wasmo"
-    remove_link "lite"
+    remove_link "wasmo-setup"
 }
 
 # DESCRIPTION:
