@@ -47,25 +47,25 @@
     <details>
       <summary>Read more</summary>
 
-      - POSIX (BASH, ZSH, ...)
+      - Posix (Bash, Zsh, ...)
 
         ```
         export LLVM_SYS_80_PREFIX="/path/to/llvm"
         ```
 
-      - FISH
+      - Fish
 
         ```
         setenv LLVM_SYS_80_PREFIX "/path/to/llvm"
         ```
 
-      - CMD [WINDOWS]
+      - Cmd
 
         ```
         set LLVM_SYS_80_PREFIX="/path/to/llvm"
         ```
 
-      - POWERSHELL [WINDOWS]
+      - Powershell
 
         ```
         setx LLVM_SYS_80_PREFIX "/path/to/llvm"
